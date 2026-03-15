@@ -18,25 +18,21 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- Настройка почты ---
+// --- Настройка почты через Brevo (финально) ---
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, 
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false, // Обязательно false для порта 587
     auth: {
-        user: 'auramessengercode@gmail.com', 
-        pass: 'jcxi laqa dlmv vaji' 
+        user: 'auramessengercode@gmail.com', // Твоя почта Brevo
+        pass: 'xsmtpsib-e9e6f4faa1d6bd0b069d1de63fbf0ab53d9dbd751633a5da18fc977d5cea7747-2xiDH67WQi3g6re3'
     },
-    // КРИТИЧЕСКИ ВАЖНО для Render:
-    family: 4, 
-    connectionTimeout: 10000, 
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+    // Дополнительные параметры для стабильности
+    connectionTimeout: 10000,
     tls: {
         rejectUnauthorized: false
     }
 });
-
 const verificationCodes = {};
 
 // --- Настройки сервера ---
