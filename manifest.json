@@ -1,0 +1,29 @@
+{
+  "name": "Aura Messenger",
+  "short_name": "Aura",
+  "description": "Приложение для быстрого обмена сообщениями Aura",
+  "id": "aura.messenger.app",
+  "start_url": "/auth.html",
+  "display": "standalone",
+  "background_color": "#212121",
+  "theme_color": "#8774e1",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/134/134932.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/134/134932.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Aura Chat Screen"
+    }
+  ]
+}

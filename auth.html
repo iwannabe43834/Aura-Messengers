@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura Messenger — Авторизация</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        /* Стиль в духе Telegram Web */
+        body {
+            background-color: #212121;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 360px;
+            padding: 20px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .auth-logo img {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 25px;
+            border-radius: 50%;
+        }
+
+        h1 { font-size: 24px; font-weight: 600; margin-bottom: 10px; }
+        .subtitle { color: #aaaaaa; font-size: 15px; margin-bottom: 30px; }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 15px;
+            border: 1px solid #2f2f2f;
+            border-radius: 12px;
+            padding: 10px 15px;
+            text-align: left;
+            background: #212121;
+        }
+
+        .input-group:focus-within { border-color: #8774e1; }
+        .input-group label { display: block; color: #8774e1; font-size: 12px; margin-bottom: 4px; font-weight: 600; }
+        .input-group input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .auth-btn {
+            width: 100%;
+            padding: 14px;
+            background: #8774e1;
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: uppercase;
+            margin-top: 10px;
+        }
+
+        .auth-btn:disabled { background: #555; cursor: not-allowed; }
+        .auth-btn.secondary { background: transparent; border: 1px solid #2f2f2f; margin-top: 15px; }
+        .text-link { color: #8774e1; font-size: 14px; display: inline-block; margin-top: 20px; cursor: pointer; }
+        .hidden { display: none !important; }
+
+        #authCode {
+            text-align: center;
+            font-size: 24px;
+            letter-spacing: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="auth-card">
+        <div class="auth-logo">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="Aura Logo">
+        </div>
+
+        <div id="stepWelcome">
+            <h1>Aura Messenger</h1>
+            <p class="subtitle">Твой уголок безопасности</p>
+            <button class="auth-btn" onclick="startFlow('login')">ВОЙТИ</button>
+            <button class="auth-btn secondary" onclick="startFlow('register')">РЕГИСТРАЦИЯ</button>
+        </div>
+
+        <div id="stepEmail" class="hidden">
+            <h1 id="emailTitle">Вход</h1>
+            <p class="subtitle">Введите ваш E-mail для продолжения</p>
+            <div class="input-group">
+                <label>E-mail</label>
+                <input type="email" id="authEmail" placeholder="example@mail.com">
+            </div>
+            <button class="auth-btn" id="btnEmail" onclick="handleEmailSubmit()">ПРОДОЛЖИТЬ</button>
+            <span class="text-link" onclick="showStep('stepWelcome')">Назад</span>
+        </div>
+
+        <div id="stepLoginMethod" class="hidden">
+            <h1>Как войти?</h1>
+            <p class="subtitle">Выберите удобный способ авторизации</p>
+            <button class="auth-btn" onclick="sendCodeAndGo()">ПОЛУЧИТЬ КОД</button>
+            <button class="auth-btn secondary" onclick="showStep('stepPasswordLogin')">ВОЙТИ ПО ПАРОЛЮ</button>
+            <span class="text-link" onclick="showStep('stepEmail')">Назад</span>
+        </div>
+
+        <div id="stepPasswordLogin" class="hidden">
+            <h1>Пароль</h1>
+            <p class="subtitle">Введите ваш пароль от аккаунта</p>
+            <div class="input-group">
+                <label>Пароль</label>
+                <input type="password" id="loginPass" placeholder="••••••••">
+            </div>
+            <button class="auth-btn" id="btnLoginPass" onclick="loginWithPassword()">ВОЙТИ</button>
+            <span class="text-link" onclick="showStep('stepLoginMethod')">Назад</span>
+        </div>
+
+        <div id="stepCode" class="hidden">
+            <h1>Код из письма</h1>
+            <p class="subtitle">Мы отправили код на <br><b id="userEmailLabel" style="color: #fff;"></b></p>
+            <div class="input-group">
+                <label>Код подтверждения</label>
+                <input type="text" id="authCode" placeholder="----" maxlength="4">
+            </div>
+            <button class="auth-btn" id="btnVerify" onclick="verifyCode()">ПОДТВЕРДИТЬ</button>
+            <span class="text-link" onclick="showStep('stepEmail')">Изменить почту</span>
+        </div>
+
+        <div id="stepProfile" class="hidden">
+            <h1>Создать профиль</h1>
+            <p class="subtitle">Вас нет в системе, давайте это исправим</p>
+            <div class="input-group">
+                <label>Ваше имя</label>
+                <input type="text" id="regFullName" placeholder="Иван Иванов">
+            </div>
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="regUsername" placeholder="nickname">
+            </div>
+            <div class="input-group">
+                <label>Придумайте пароль</label>
+                <input type="password" id="regPass" placeholder="Минимум 6 знаков">
+            </div>
+            <button class="auth-btn" id="btnRegister" onclick="finishRegistration()">НАЧАТЬ ОБЩЕНИЕ</button>
+        </div>
+    </div>
+
+    <script>
+        let currentFlow = ''; // 'login' или 'register'
+        let currentEmail = '';
+
+        // Переключение экранов
+        function showStep(stepId) {
+            document.querySelectorAll('.auth-card > div').forEach(div => {
+                if(div.id !== 'auth-logo') div.classList.add('hidden');
+            });
+            document.getElementById('stepWelcome').classList.add('hidden'); // На всякий случай
+            document.getElementById(stepId).classList.remove('hidden');
+        }
+
+        // Старт
+        function startFlow(mode) {
+            currentFlow = mode;
+            document.getElementById('emailTitle').innerText = (mode === 'login') ? 'Вход' : 'Регистрация';
+            showStep('stepEmail');
+        }
+
+        // Шаг 1: Проверка почты
+        async function handleEmailSubmit() {
+            currentEmail = document.getElementById('authEmail').value.trim();
+            if (!currentEmail.includes('@')) return alert("Введите корректную почту!");
+
+            if (currentFlow === 'login') {
+                showStep('stepLoginMethod');
+            } else {
+                sendCodeAndGo(); // При регистрации сразу шлем код
+            }
+        }
+
+        // Отправка кода через сервер
+        async function sendCodeAndGo() {
+            const btn = document.getElementById('btnEmail');
+            btn.disabled = true;
+            btn.innerText = "ОТПРАВКА...";
+
+            try {
+                const response = await fetch('/api/send-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail })
+                });
+
+                if (response.ok) {
+                    document.getElementById('userEmailLabel').innerText = currentEmail;
+                    showStep('stepCode');
+                } else {
+                    alert("Ошибка при отправке кода. Проверьте сервер.");
+                }
+            } catch (e) {
+                alert("Сервер не отвечает");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "ПРОДОЛЖИТЬ";
+            }
+        }
+
+        // Вход по паролю
+        async function loginWithPassword() {
+    const password = document.getElementById('loginPass').value;
+    const btn = document.getElementById('btnLoginPass');
+    btn.disabled = true;
+
+    const response = await fetch('/api/login-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: currentEmail, password })
+    });
+
+    if (response.ok) {
+        const result = await response.json(); // ПОЛУЧАЕМ ДАННЫЕ ОТ СЕРВЕРА
+        localStorage.setItem('username', result.username); // СОХРАНЯЕМ НИК
+        window.location.href = "/index.html";
+    } else {
+        const err = await response.json();
+        alert(err.error || "Ошибка входа");
+    }
+    btn.disabled = false;
+}
+        // Проверка кода (КЛЮЧЕВОЙ МОМЕНТ)
+        async function verifyCode() {
+    const code = document.getElementById('authCode').value.trim();
+    if (code.length < 4) return alert("Введите 4 цифры");
+
+    const btn = document.getElementById('btnVerify');
+    btn.disabled = true;
+
+    const response = await fetch('/api/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: currentEmail, code: code })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+        if (result.isNewUser) {
+            showStep('stepProfile');
+        } else {
+            localStorage.setItem('username', result.username); // СОХРАНЯЕМ НИК
+            window.location.href = "/index.html";
+        }
+    } else {
+        alert(result.error || "Неверный код!");
+    }
+    btn.disabled = false;
+}
+
+        // Финальная регистрация
+        async function finishRegistration() {
+    const name = document.getElementById('regFullName').value.trim();
+    const user = document.getElementById('regUsername').value.trim();
+    const pass = document.getElementById('regPass').value;
+
+    if (!name || !user || pass.length < 6) return alert("Заполните все поля! Пароль от 6 знаков.");
+
+    const btn = document.getElementById('btnRegister');
+    btn.disabled = true;
+
+    const response = await fetch('/api/register-final', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            email: currentEmail, 
+            fullname: name, 
+            username: user, 
+            password: pass 
+        })
+    });
+
+    if (response.ok) {
+        localStorage.setItem('username', user); // СОХРАНЯЕМ ТОЛЬКО ЧТО СОЗДАННЫЙ НИК
+        window.location.href = "/index.html";
+    } else {
+        const err = await response.json();
+        alert(err.error || "Ошибка регистрации");
+    }
+    btn.disabled = false;
+}
+    </script>
+</body>
+</html>
