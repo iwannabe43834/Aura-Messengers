@@ -5,34 +5,31 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const path = require('path');
-const nodemailer = require('nodemailer');
+// Nodemailer больше не нужен, используем официальный пакет Brevo
+const SibApiV3Sdk = require('@getbrevo/brevo');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    maxHttpBufferSize: 5e7 // 50МБ для медиафайлов
+    maxHttpBufferSize: 5e7 
 });
 
-app.use((req, res, next) => {
-    res.setHeader('ngrok-skip-browser-warning', 'true');
-    next();
-});
+// --- Настройка Brevo API ---
+let apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+let apiKey = apiInstance.authentications['apiKey'];
+apiKey.apiKey = 'xsmtpsib-e9e6f4faa1d6bd0b069d1de63fbf0ab53d9dbd751633a5da18fc977d5cea7747-2xiDH67WQi3g6re3';
 
-// --- Настройка почты через Brevo (финально) ---
-const transporter = nodemailer.createTransport({
-    host: 'smtp-relay.brevo.com',
-    port: 587,
-    secure: false, // Обязательно false для порта 587
-    auth: {
-        user: 'auramessengercode@gmail.com', // Твоя почта Brevo
-        pass: 'xsmtpsib-e9e6f4faa1d6bd0b069d1de63fbf0ab53d9dbd751633a5da18fc977d5cea7747-2xiDH67WQi3g6re3'
-    },
-    // Дополнительные параметры для стабильности
-    connectionTimeout: 10000,
-    tls: {
-        rejectUnauthorized: false
-    }
-});
+// Функция-помощник для отправки писем через API
+async function sendBrevoEmail(toEmail, subject, textContent) {
+    let sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = subject;
+    sendSmtpEmail.textContent = textContent;
+    sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
+    sendSmtpEmail.to = [{ "email": toEmail }];
+    
+    return apiInstance.sendTransacEmail(sendSmtpEmail);
+}
+
 const verificationCodes = {};
 
 // --- Настройки сервера ---
@@ -53,26 +50,23 @@ app.use(session({
 
 // --- НОВЫЕ МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ ---
 
-// 1. Отправка кода (вызывается при нажатии "Продолжить")
 app.post('/api/send-code', async (req, res) => {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email обязателен' });
-
-    // Генерируем 4-значный код (как ждет фронтенд)
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     verificationCodes[email] = { code, email };
 
     try {
-        await transporter.sendMail({
-            from: 'auramessengercode@gmail.com',
-            to: email,
-            subject: 'Aura Messenger Code',
-            text: `Ваш код подтверждения: ${code}`
-        });
+        let sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+        sendSmtpEmail.subject = "Aura Messenger Code";
+        sendSmtpEmail.textContent = `Ваш код подтверждения: ${code}`;
+        sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
+        sendSmtpEmail.to = [{ "email": email }];
+
+        await apiInstance.sendTransacEmail(sendSmtpEmail);
         res.json({ success: true });
     } catch (err) {
-        console.error("Ошибка почты:", err);
-        res.status(500).json({ error: 'Не удалось отправить письмо' });
+        console.error(err);
+        res.status(500).json({ error: 'Ошибка API' });
     }
 });
 
