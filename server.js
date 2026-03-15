@@ -54,20 +54,25 @@ app.use(session({
 app.post('/api/send-code', async (req, res) => {
     const { email } = req.body;
     const code = Math.floor(1000 + Math.random() * 9000).toString();
-    verificationCodes[email] = { code, email };
+    codes[email] = code;
+
+    // Выводим код в логи Render, чтобы ты его видел без почты!
+    console.log(`\n--- ВНИМАНИЕ: КОД ДЛЯ ${email} : [ ${code} ] ---\n`);
+
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = "Aura Messenger Code";
+    sendSmtpEmail.textContent = `Ваш код подтверждения: ${code}`;
+    sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
+    sendSmtpEmail.to = [{ "email": email }];
 
     try {
-        let sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-        sendSmtpEmail.subject = "Aura Messenger Code";
-        sendSmtpEmail.textContent = `Ваш код подтверждения: ${code}`;
-        sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
-        sendSmtpEmail.to = [{ "email": email }];
-
         await apiInstance.sendTransacEmail(sendSmtpEmail);
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Ошибка API' });
+        res.status(200).json({ message: 'Код отправлен' });
+    } catch (error) {
+        // Мы НЕ выдаем ошибку пользователю, даже если почта не ушла.
+        // Главное, что ты увидел код в консоли!
+        console.log("Ошибка Brevo (аккаунт не активен), но код в консоли выше ↑");
+        res.status(200).json({ message: 'Код сгенерирован (проверьте логи)' });
     }
 });
 
