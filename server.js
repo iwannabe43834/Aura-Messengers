@@ -21,18 +21,18 @@ app.use((req, res, next) => {
 // --- Настройка почты ---
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465, // Используем порт 465 (SSL) — он чаще открыт на хостингах, чем 587
-    secure: true, // true для порта 465
+    port: 465,
+    secure: true, 
     auth: {
         user: 'auramessengercode@gmail.com', 
-        pass: 'jcxi laqa dlmv vaji' // Пароль приложения
+        pass: 'jcxi laqa dlmv vaji' 
     },
-    // Добавляем настройки таймаута, чтобы сервер не «висел»
+    // КРИТИЧЕСКИ ВАЖНО для Render:
+    family: 4, 
     connectionTimeout: 10000, 
     greetingTimeout: 10000,
     socketTimeout: 10000,
     tls: {
-        // Помогает обойти проблемы с проверкой сертификатов на облачных серверах
         rejectUnauthorized: false
     }
 });
