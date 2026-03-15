@@ -5,7 +5,6 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const path = require('path');
-// Nodemailer больше не нужен, используем официальный пакет Brevo
 const SibApiV3Sdk = require('@getbrevo/brevo');
 
 const app = express();
@@ -20,11 +19,40 @@ let apiKey = apiInstance.authentications['apiKey'];
 // Берем ключ из настроек сервера (Environment Variables)
 apiKey.apiKey = process.env.BREVO_API_KEY;
 
-// Функция-помощник для отправки писем через API
-async function sendBrevoEmail(toEmail, subject, textContent) {
+// --- HTML Шаблон для красивого письма ---
+function getEmailTemplate(code) { 
+    return ` 
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; padding: 40px 20px; text-align: center; margin: 0;"> 
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 0 auto;"> 
+            <tr> 
+                <td style="background-color: #2AABEE; padding: 25px; text-align: center;"> 
+                    <h1 style="margin: 0; font-size: 26px; font-weight: 600; color: #ffffff; letter-spacing: 0.5px;">Aura Messenger</h1> 
+                </td> 
+            </tr> 
+            <tr> 
+                <td style="padding: 40px 30px; text-align: center; color: #333333;"> 
+                    <p style="font-size: 18px; margin: 0 0 20px 0; font-weight: 500;">Здравствуйте!</p> 
+                    <p style="font-size: 15px; margin: 0 0 30px 0; line-height: 1.6; color: #555555;"> Вы запросили код подтверждения для доступа к вашему аккаунту. Пожалуйста, введите этот код в приложении: </p> 
+                    <div style="display: inline-block; background-color: #f4f8fb; border: 1px solid #e1eef7; border-radius: 10px; padding: 15px 30px; margin-bottom: 30px;"> 
+                        <span style="font-size: 36px; font-weight: bold; color: #2AABEE; letter-spacing: 8px;">${code}</span> 
+                    </div> 
+                    <p style="font-size: 13px; color: #999999; margin: 0; line-height: 1.5;"> Если вы не пытались войти в Aura Messenger, просто проигнорируйте и удалите это письмо. </p> 
+                </td> 
+            </tr> 
+            <tr> 
+                <td style="background-color: #fafafa; padding: 20px; text-align: center; font-size: 12px; color: #aaaaaa; border-top: 1px solid #eeeeee;"> © ${new Date().getFullYear()} Aura Messenger. Все права защищены. </td> 
+            </tr> 
+        </table> 
+    </div> 
+    `; 
+}
+
+// Универсальная функция-помощник для отправки писем через API
+async function sendBrevoEmail(toEmail, subject, textContent, htmlContent = null) {
     let sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = subject;
     sendSmtpEmail.textContent = textContent;
+    if (htmlContent) sendSmtpEmail.htmlContent = htmlContent;
     sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
     sendSmtpEmail.to = [{ "email": toEmail }];
     
@@ -49,21 +77,21 @@ app.use(session({
     }
 }));
 
-// --- НОВЫЕ МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ ---
+// --- МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ ---
 
 app.post('/api/send-code', async (req, res) => {
     const { email } = req.body;
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // Исправленное имя переменной и формат записи
     verificationCodes[email] = { code: code, timestamp: Date.now() };
 
-    // Печатаем в логи для входа без почты
+    // Печатаем в логи для дебага
     console.log(`\n===============================\nКОД ДЛЯ ${email} : [ ${code} ]\n===============================\n`);
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = "Aura Messenger Code";
-    sendSmtpEmail.textContent = `Ваш код подтверждения: ${code}`;
+    sendSmtpEmail.subject = "Код подтверждения Aura Messenger";
+    sendSmtpEmail.htmlContent = getEmailTemplate(code);
+    sendSmtpEmail.textContent = `Здравствуйте! Ваш код подтверждения: ${code}`;
     sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
     sendSmtpEmail.to = [{ "email": email }];
 
@@ -71,12 +99,12 @@ app.post('/api/send-code', async (req, res) => {
         await apiInstance.sendTransacEmail(sendSmtpEmail);
         res.status(200).json({ message: 'Код отправлен' });
     } catch (error) {
-        console.log("Brevo пока не активен, но код выше в логах ↑");
+        console.log("Ошибка Brevo (письмо не ушло, код выше в логах ↑):", error.message || error);
         res.status(200).json({ message: 'Режим отладки: проверьте логи' });
     }
 });
 
-// 2. Проверка кода (вызывается после ввода цифр)
+// 2. Проверка кода
 app.post('/api/verify-code', (req, res) => {
     const { email, code } = req.body;
     const pending = verificationCodes[email];
@@ -86,20 +114,17 @@ app.post('/api/verify-code', (req, res) => {
     }
     
     const users = readData(USERS_FILE);
-    // Ищем, есть ли уже юзер с такой почтой
     const username = Object.keys(users).find(k => users[k].email === email);
 
     if (username) {
-        // Юзер уже есть — логиним его
         req.session.username = username;
         res.json({ isNewUser: false, user: { username, ...users[username] } });
     } else {
-        // Юзера нет — отправляем заполнять профиль
         res.json({ isNewUser: true });
     }
 });
 
-// 3. Финальная регистрация (когда ввели ник и пароль)
+// 3. Финальная регистрация
 app.post('/api/register-final', async (req, res) => {
     const { email, fullname, username, password } = req.body;
     const users = readData(USERS_FILE);
@@ -144,12 +169,11 @@ function writeData(file, data) {
     fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-// Вход по паролю (если аккаунт уже существует)
+// Вход по паролю
 app.post('/api/login-password', async (req, res) => {
     const { email, password } = req.body;
     const users = readData(USERS_FILE);
     
-    // Ищем юзера по почте
     const username = Object.keys(users).find(k => users[k].email === email);
     const user = users[username];
     
@@ -203,7 +227,6 @@ app.get('/api/entity/:id', (req, res) => {
     const groups = readData(GROUPS_FILE);
     const caller = users[callerId];
 
-    // Проверяем, является ли id группой
     if (groups[id]) {
         const group = groups[id];
         return res.json({
@@ -219,7 +242,6 @@ app.get('/api/entity/:id', (req, res) => {
         });
     }
 
-    // Если не группа, ищем пользователя
     const user = users[id];
     if (!user) return res.status(404).json({ error: 'Not found' });
 
@@ -227,7 +249,6 @@ app.get('/api/entity/:id', (req, res) => {
     let inContacts = false;
     
     if (caller && caller.contacts) {
-        // Ищем в контактах вызывающего. Поддержка старого формата (строки) и нового (объекты)
         const contactObj = caller.contacts.find(c => typeof c === 'object' ? c.username === id : c === id);
         if (contactObj) {
             inContacts = true;
@@ -243,7 +264,7 @@ app.get('/api/entity/:id', (req, res) => {
         type: 'user',
         username: id,
         name: user.name,
-        displayName: displayName, // Кастомное имя или имя юзера
+        displayName: displayName,
         avatar: user.avatar,
         bio: user.bio,
         birthday: user.birthday,
@@ -275,7 +296,6 @@ io.on('connection', (socket) => {
         io.emit('user_status_change', { username, online: true, lastSeen: 'online' });
     });
 
-    // Поиск только пользователей (группы ищутся по-другому или добавляются по ссылке, здесь пока только юзеры)
     socket.on('search_user', (searchUsername) => {
         const users = readData(USERS_FILE);
         if (users[searchUsername]) {
@@ -293,7 +313,6 @@ io.on('connection', (socket) => {
         const myUser = users[currentUsername];
         let chats = new Set();
         
-        // Личные чаты из сообщений
         msgs.forEach(m => {
             if (!(m.deletedFor && m.deletedFor.includes(currentUsername))) {
                 if (m.from === currentUsername && !groups[m.to]) chats.add(m.to);
@@ -301,7 +320,6 @@ io.on('connection', (socket) => {
             }
         });
         
-        // Добавляем контакты
         if (myUser && myUser.contacts) {
             myUser.contacts.forEach(c => {
                 const cUser = typeof c === 'object' ? c.username : c;
@@ -309,11 +327,10 @@ io.on('connection', (socket) => {
             });
         }
         
-        chats.delete(currentUsername); // Убираем 'me' (избранное), оно отображается отдельно
+        chats.delete(currentUsername);
         
         let chatsArray = Array.from(chats);
 
-        // Добавляем группы, в которых состоит пользователь
         for (const groupId in groups) {
             if (groups[groupId].members.includes(currentUsername)) {
                 chatsArray.push(groupId);
@@ -335,10 +352,8 @@ io.on('connection', (socket) => {
         if (chatWith === 'me') {
             history = msgs.filter(m => m.from === currentUsername && m.to === 'me' && !(m.deletedFor && m.deletedFor.includes(currentUsername)));
         } else if (groups[chatWith]) {
-            // История группы
             history = msgs.filter(m => m.to === chatWith && !(m.deletedFor && m.deletedFor.includes(currentUsername)));
         } else {
-            // Личная переписка
             history = msgs.filter(m => 
                 ((m.from === currentUsername && m.to === chatWith) || 
                  (m.from === chatWith && m.to === currentUsername)) &&
@@ -346,7 +361,6 @@ io.on('connection', (socket) => {
             );
         }
 
-        // Добавляем display names для групповых сообщений
         history = history.map(m => {
             let fromDisplayName = m.from;
             if (m.from !== currentUsername && groups[chatWith]) {
@@ -369,7 +383,7 @@ io.on('connection', (socket) => {
         const msg = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
             from: currentUsername,
-            to: data.to, // ID пользователя или ID группы
+            to: data.to,
             text: data.text,
             media: data.media || null,
             reply: data.reply || null,
@@ -388,13 +402,11 @@ io.on('connection', (socket) => {
         const myUser = users[currentUsername];
 
         if (groups[data.to]) {
-            // Отправка в группу
             const group = groups[data.to];
             
-            // Формируем имя отправителя для каждого участника (у каждого может быть свое кастомное имя)
             group.members.forEach(memberUsername => {
                 if (memberUsername === currentUsername) {
-                    socket.emit('msg_receive', msg); // Себе отправляем как есть
+                    socket.emit('msg_receive', msg);
                 } else if (onlineUsers[memberUsername]) {
                     const memberUser = users[memberUsername];
                     let fromDisplayName = currentUsername;
@@ -412,7 +424,6 @@ io.on('connection', (socket) => {
                 }
             });
         } else {
-            // Личное сообщение
             socket.emit('msg_receive', msg);
             if (data.to !== 'me' && data.to !== currentUsername && onlineUsers[data.to]) {
                 const recipient = users[data.to];
@@ -430,7 +441,6 @@ io.on('connection', (socket) => {
         let updated = false;
         
         if (groups[data.chatWith]) {
-             // Для групп упрощенная логика прочтения: если кто-то прочел, помечаем у отправителя
              allMsgs.forEach(m => {
                 if (m.to === data.chatWith && m.from !== currentUsername && !m.read) {
                     m.read = true;
@@ -439,7 +449,6 @@ io.on('connection', (socket) => {
                 }
             });
         } else {
-            // Личные сообщения
             allMsgs.forEach(m => {
                 if (m.from === data.chatWith && m.to === currentUsername && !m.read) {
                     m.read = true;
@@ -486,12 +495,9 @@ io.on('connection', (socket) => {
         if (!users[currentUsername].contacts) users[currentUsername].contacts = [];
         
         let contacts = users[currentUsername].contacts;
-        
-        // Удаляем старые записи с этим юзернеймом
         contacts = contacts.filter(c => (typeof c === 'object' ? c.username : c) !== data.username);
         
         if (!data.remove) {
-            // Добавляем как объект
             contacts.push({
                 username: data.username,
                 customName: data.customName || data.username
@@ -535,9 +541,8 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Ограничение до 100 участников (включая создателя)
         let members = [currentUsername, ...data.members];
-        members = [...new Set(members)]; // Убираем дубликаты
+        members = [...new Set(members)];
         if (members.length > 100) members = members.slice(0, 100);
 
         groups[data.id] = {
@@ -551,13 +556,11 @@ io.on('connection', (socket) => {
 
         writeData(GROUPS_FILE, groups);
         
-        // Уведомляем создателя
         socket.emit('group_created', { groupId: data.id });
         
-        // Обновляем список чатов у всех добавленных участников онлайн
         members.forEach(member => {
             if (member !== currentUsername && onlineUsers[member]) {
-                io.to(onlineUsers[member]).emit('search_result', { exists: true, username: data.id }); // Триггерим обновление UI
+                io.to(onlineUsers[member]).emit('search_result', { exists: true, username: data.id });
             }
         });
     });
@@ -569,15 +572,13 @@ io.on('connection', (socket) => {
         if (groups[data.groupId]) {
             groups[data.groupId].members = groups[data.groupId].members.filter(m => m !== currentUsername);
             
-            // Если в группе никого не осталось, удаляем ее
             if (groups[data.groupId].members.length === 0) {
                 delete groups[data.groupId];
             }
             writeData(GROUPS_FILE, groups);
-            socket.emit('get_my_chats'); // Обновляем список
+            socket.emit('get_my_chats');
         }
     });
-
 
     socket.on('add_reaction', (data) => {
         if (!currentUsername) return;
@@ -612,7 +613,6 @@ io.on('connection', (socket) => {
                 allMsgs.splice(msgIndex, 1);
                 writeData(MESSAGES_FILE, allMsgs);
                 
-                // Рассылаем удаление всем
                 if (groups[recipient]) {
                     groups[recipient].members.forEach(member => {
                         if (onlineUsers[member]) io.to(onlineUsers[member]).emit('msg_deleted', { id: data.id });
