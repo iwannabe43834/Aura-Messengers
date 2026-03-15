@@ -20,10 +20,20 @@ app.use((req, res, next) => {
 
 // --- Настройка почты ---
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465, // Явно указываем защищенный порт
+    secure: true, // Используем SSL/TLS
     auth: {
         user: 'auramessengercode@gmail.com', 
-        pass: 'jcxi laqa dlmv vaji' 
+        pass: 'jcxi laqa dlmv vaji' // КРАЙНЕ РЕКОМЕНДУЮ вынести это в process.env.EMAIL_PASS
+    },
+    // Добавляем защиту от зависаний
+    connectionTimeout: 10000, 
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+    // Эта настройка иногда нужна на облачных серверах для обхода строгих проверок сертификатов
+    tls: {
+        rejectUnauthorized: false
     }
 });
 
