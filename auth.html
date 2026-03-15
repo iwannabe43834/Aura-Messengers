@@ -230,9 +230,10 @@
     });
 
     if (response.ok) {
-        const result = await response.json(); // ПОЛУЧАЕМ ДАННЫЕ ОТ СЕРВЕРА
-        localStorage.setItem('username', result.username); // СОХРАНЯЕМ НИК
-        window.location.href = "/index.html";
+    const result = await response.json();
+    localStorage.setItem('username', result.user.username); // Добавили .user
+    window.location.href = "/index.html";
+}
     } else {
         const err = await response.json();
         alert(err.error || "Ошибка входа");
@@ -255,13 +256,12 @@
 
     const result = await response.json();
 
-    if (response.ok) {
-        if (result.isNewUser) {
-            showStep('stepProfile');
-        } else {
-            localStorage.setItem('username', result.username); // СОХРАНЯЕМ НИК
-            window.location.href = "/index.html";
-        }
+    if (result.isNewUser) {
+    showStep('stepProfile');
+} else {
+    localStorage.setItem('username', result.user.username); // Добавили .user
+    window.location.href = "/index.html";
+}
     } else {
         alert(result.error || "Неверный код!");
     }
