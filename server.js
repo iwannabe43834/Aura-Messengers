@@ -140,53 +140,11 @@ function writeData(file, data) {
 
 // --- API Маршруты ---
 app.post('/register', async (req, res) => {
-    const { username, password, email } = req.body;
-    const users = readData(USERS_FILE);
-    
-    if (users[username]) return res.status(400).json({ error: 'Пользователь уже существует' });
-    if (Object.values(users).some(u => u.email === email)) return res.status(400).json({ error: 'Email уже используется' });
-    if (!username || !password || !email) return res.status(400).json({ error: 'Все поля обязательны' });
-    
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    verificationCodes[email] = { code, username, password: await bcrypt.hash(password, 10), email };
-    
-    try {
-        await transporter.sendMail({
-            from: 'auramessengercode@gmail.com',
-            to: email,
-            subject: 'Код подтверждения Aura',
-            text: `Ваш код для регистрации: ${code}`
-        });
-        res.json({ success: true, message: 'Код отправлен на почту' });
-    } catch (err) {
-        res.status(500).json({ error: 'Ошибка отправки почты' });
-    }
+   
 });
 
 app.post('/verify-code', (req, res) => {
-    const { email, code } = req.body;
-    const pending = verificationCodes[email];
-    
-    if (!pending || pending.code !== code) return res.status(400).json({ error: 'Неверный код' });
-    
-    const users = readData(USERS_FILE);
-    users[pending.username] = {
-        password: pending.password,
-        email: pending.email,
-        name: pending.username, // По умолчанию имя равно юзернейму
-        avatar: null,
-        bio: '',
-        birthday: '',
-        profilePattern: 'none',
-        contacts: [], // Теперь это будет массив объектов {username, customName}
-        blocked: [],
-        lastSeen: Date.now()
-    };
-    writeData(USERS_FILE, users);
-    delete verificationCodes[email];
-    
-    req.session.username = pending.username;
-    res.json({ success: true });
+   
 });
 
 // Вход по паролю (если аккаунт уже существует)
