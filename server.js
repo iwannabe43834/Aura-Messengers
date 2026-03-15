@@ -138,15 +138,6 @@ function writeData(file, data) {
     fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-// --- API Маршруты ---
-app.post('/register', async (req, res) => {
-   
-});
-
-app.post('/verify-code', (req, res) => {
-   
-});
-
 // Вход по паролю (если аккаунт уже существует)
 app.post('/api/login-password', async (req, res) => {
     const { email, password } = req.body;
