@@ -17,7 +17,8 @@ const io = new Server(server, {
 // --- Настройка Brevo API ---
 let apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 let apiKey = apiInstance.authentications['apiKey'];
-apiKey.apiKey = 'xsmtpsib-e9e6f4faa1d6bd0b069d1de63fbf0ab53d9dbd751633a5da18fc977d5cea7747-2xiDH67WQi3g6re3';
+// Берем ключ из настроек сервера (Environment Variables)
+apiKey.apiKey = process.env.BREVO_API_KEY;
 
 // Функция-помощник для отправки писем через API
 async function sendBrevoEmail(toEmail, subject, textContent) {
