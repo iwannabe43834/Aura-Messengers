@@ -32,17 +32,30 @@
         .reaction-badge.reacted { border-color: var(--primary); background: var(--primary-soft); }
         .reaction-badge:hover { transform: scale(1.05); filter: brightness(1.2); }
         
-        /* Дополнительные стили для новых модалок (потом можно перенести в style.css) */
+        /* Стили модалок */
         .modal-form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; text-align: left; padding: 0 20px;}
         .modal-form-group label { font-size: 0.8rem; color: var(--primary); font-weight: bold; text-transform: uppercase; }
         .modal-form-group input, .modal-form-group textarea { width: 100%; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; color: var(--text-main); outline: none; }
         .modal-form-group input:focus, .modal-form-group textarea:focus { border-color: var(--primary); }
-        .members-select-list { max-height: 150px; overflow-y: auto; background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border); padding: 5px; }
-        .member-option { display: flex; align-items: center; gap: 10px; padding: 8px; cursor: pointer; border-radius: 8px; }
+        
+        .members-select-list, .group-members-manage-list { max-height: 150px; overflow-y: auto; background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border); padding: 5px; }
+        .member-option { display: flex; align-items: center; gap: 10px; padding: 8px; cursor: pointer; border-radius: 8px; justify-content: space-between; }
         .member-option:hover { background: var(--bg-hover); }
         .member-option input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); }
+        
         .group-avatar-upload { width: 80px; height: 80px; border-radius: 50%; background: var(--bg-secondary); border: 2px dashed var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; cursor: pointer; font-size: 1.5rem; color: var(--text-dim); background-size: cover; background-position: center; }
         .msg-sender-name { font-size: 0.8rem; font-weight: bold; color: var(--primary); margin-bottom: 3px; cursor: pointer; }
+
+        /* Новые стили для каналов и админки */
+        .type-selector { display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; }
+        .type-selector label { padding: 10px 20px; background: var(--bg-secondary); border-radius: 20px; cursor: pointer; font-size: 0.9rem; border: 1px solid var(--border); transition: 0.2s; }
+        .type-selector input { display: none; }
+        .type-selector input:checked + label { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .readonly-banner { text-align: center; padding: 15px; background: var(--bg-secondary); color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); }
+        .admin-edit-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1rem; padding: 5px; margin-left: 10px; }
+        .danger-btn-small { background: var(--bg-hover); color: #ff3b30; border: 1px solid rgba(255,59,48,0.3); border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; cursor: pointer; }
+        .danger-btn-small:hover { background: rgba(255,59,48,0.1); }
     </style>
 </head>
 <body class="pattern-none" id="app-body" data-theme="dark" data-lang="ru">
@@ -51,6 +64,12 @@
 <audio id="snd-notify" src="notify.mp3" preload="auto"></audio>
 
 <div class="app-container" id="main-container">
+    <div id="liquid-bg" class="liquid-bg hidden">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
     <div id="toast-container" class="toast-container"></div>
 
     <div id="msg-context-menu" class="custom-context-menu hidden">
@@ -90,8 +109,15 @@
                 <button class="close-profile-btn" onclick="toggleCreateGroupModal(false)"><i class="fas fa-times"></i></button>
             </div>
             <div class="profile-main-info">
-                <h2 data-i18n="createGroup">Создать группу</h2>
-                <p data-i18n="groupMembersLimit">до 100 участников</p>
+                <h2 id="modal-group-title" data-i18n="createGroup">Создать сообщество</h2>
+            </div>
+
+            <div class="type-selector" id="group-type-selector">
+                <input type="radio" id="type-group" name="chat-type" value="group" checked>
+                <label for="type-group" data-i18n="typeGroup">Группа</label>
+                
+                <input type="radio" id="type-channel" name="chat-type" value="channel">
+                <label for="type-channel" data-i18n="typeChannel">Канал</label>
             </div>
             
             <input type="file" id="group-avatar-input" style="display:none" accept="image/*" onchange="previewGroupAvatar(this)">
@@ -99,25 +125,25 @@
                 <i class="fas fa-camera"></i>
             </div>
 
-            <div class="modal-form-group">
-                <label data-i18n="groupUsername">Идентификатор группы (@)</label>
-                <input type="text" id="group-id-input" placeholder="my_cool_group">
+            <div class="modal-form-group" id="group-id-wrapper">
+                <label data-i18n="groupUsername">Идентификатор (@)</label>
+                <input type="text" id="group-id-input" placeholder="my_cool_channel">
             </div>
             <div class="modal-form-group">
-                <label data-i18n="groupName">Название группы</label>
+                <label data-i18n="groupName">Название</label>
                 <input type="text" id="group-name-input" placeholder="Название">
             </div>
             <div class="modal-form-group">
                 <label data-i18n="groupDesc">Описание</label>
-                <textarea id="group-desc-input" placeholder="О чем эта группа..." rows="2"></textarea>
+                <textarea id="group-desc-input" placeholder="О чем этот чат..." rows="2"></textarea>
             </div>
-            <div class="modal-form-group">
+            <div class="modal-form-group" id="group-members-wrapper">
                 <label data-i18n="addMembers">Добавить участников</label>
                 <div class="members-select-list" id="group-members-list">
-                    </div>
+                </div>
             </div>
             <div style="padding: 0 20px; margin-top: 10px;">
-                <button class="primary-btn-small" style="width: 100%;" onclick="submitCreateGroup()" data-i18n="createGroupBtn">Создать</button>
+                <button class="primary-btn-small" id="submit-group-btn" style="width: 100%;" onclick="submitCreateGroup()" data-i18n="createGroupBtn">Создать</button>
             </div>
         </div>
     </div>
@@ -126,6 +152,7 @@
         <div class="modal-content tg-style-profile">
             <div class="profile-header-actions">
                 <button class="close-profile-btn" onclick="toggleProfileModal(false)"><i class="fas fa-times"></i></button>
+                <button class="admin-edit-btn hidden" id="p-btn-edit" onclick="openEditGroupModal()"><i class="fas fa-pencil-alt"></i></button>
             </div>
             <div class="profile-cover pattern-none" id="p-cover"></div> 
             <div class="profile-scroll-area">
@@ -163,6 +190,23 @@
                         </div>
                     </div>
                     <div class="detail-separator" id="p-sep-1"></div>
+                    
+                    <div class="detail-row hidden" id="p-row-location">
+                        <i class="fas fa-map-marker-alt detail-icon"></i>
+                        <div class="detail-text-block">
+                            <span class="detail-value" id="p-location">Не указан</span>
+                            <span class="detail-label" data-i18n="locationLabel">Город / Локация</span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row hidden" id="p-row-website">
+                        <i class="fas fa-link detail-icon"></i>
+                        <div class="detail-text-block">
+                            <a href="#" class="detail-value" id="p-website" target="_blank" style="color:var(--primary); text-decoration:none;">Не указан</a>
+                            <span class="detail-label" data-i18n="websiteLabel">Веб-сайт</span>
+                        </div>
+                    </div>
+
                     <div class="detail-row" id="p-row-birthday">
                         <i class="fas fa-birthday-cake detail-icon"></i>
                         <div class="detail-text-block">
@@ -170,13 +214,19 @@
                             <span class="detail-label" data-i18n="birthday">День рождения</span>
                         </div>
                     </div>
-                    <div class="detail-row hidden" id="p-row-members">
-                        <i class="fas fa-users detail-icon"></i>
-                        <div class="detail-text-block">
-                            <span class="detail-value" id="p-members-count">0</span>
-                            <span class="detail-label" data-i18n="membersCount">Участников</span>
+                    
+                    <div class="detail-row hidden" id="p-row-members" style="flex-direction: column; align-items: flex-start;">
+                        <div style="display:flex; align-items:center; gap:15px; width:100%; margin-bottom: 10px;">
+                            <i class="fas fa-users detail-icon"></i>
+                            <div class="detail-text-block">
+                                <span class="detail-value" id="p-members-count">0</span>
+                                <span class="detail-label" data-i18n="membersCount">Участников</span>
+                            </div>
                         </div>
+                        <div id="p-members-list" class="group-members-manage-list" style="width: 100%; display: none;">
+                            </div>
                     </div>
+                    
                     <div class="detail-separator"></div>
                     <div class="detail-row">
                         <i class="fas fa-at detail-icon"></i>
@@ -207,7 +257,7 @@
             </div>
             
             <div class="settings-tabs">
-                <button class="tab-btn active" onclick="switchSettingsTab('general')" data-i18n="general">Основные</button>
+                <button class="tab-btn active" onclick="switchSettingsTab('general')" data-i18n="general">Профиль</button>
                 <button class="tab-btn" onclick="switchSettingsTab('appearance')" data-i18n="appearance">Внешний вид</button>
             </div>
 
@@ -222,6 +272,14 @@
                         <input type="text" id="edit-bio" placeholder="Расскажите немного о себе...">
                     </div>
                     <div class="settings-input-group">
+                        <label data-i18n="locationLabel">ГОРОД / ЛОКАЦИЯ</label>
+                        <input type="text" id="edit-location" placeholder="Например: Москва">
+                    </div>
+                    <div class="settings-input-group">
+                        <label data-i18n="websiteLabel">ВЕБ-САЙТ</label>
+                        <input type="url" id="edit-website" placeholder="https://...">
+                    </div>
+                    <div class="settings-input-group">
                         <label data-i18n="birthdayLabel">ДЕНЬ РОЖДЕНИЯ</label>
                         <input type="date" id="edit-birthday">
                     </div>
@@ -234,6 +292,13 @@
                 </div>
 
                 <div class="settings-list tab-content" id="tab-appearance">
+                    <div class="settings-input-group">
+                        <label data-i18n="glassEffectLabel">ЭФФЕКТ ЖИДКОГО СТЕКЛА</label>
+                        <select id="glass-select" onchange="changeGlassEffect(this.value)">
+                            <option value="off" data-i18n="off">Выкл</option>
+                            <option value="on" data-i18n="on">Вкл</option>
+                        </select>
+                    </div>
                     <div class="settings-input-group">
                         <label data-i18n="languageLabel">ЯЗЫК / LANGUAGE</label>
                         <select id="lang-select" onchange="changeLanguage(this.value)">
@@ -280,7 +345,7 @@
                 <button class="menu-btn" onclick="toggleSettings(true)"><i class="fas fa-bars"></i></button>
                 <h2 id="logo-text">Aura</h2>
                 <div style="flex:1"></div>
-                <button class="menu-btn" onclick="toggleCreateGroupModal(true)" title="Создать группу"><i class="fas fa-users"></i></button>
+                <button class="menu-btn" onclick="toggleCreateGroupModal(true)" title="Создать"><i class="fas fa-pen-to-square"></i></button>
             </div>
             <div class="search-wrapper">
                 <i class="fas fa-search"></i>
@@ -352,6 +417,8 @@
                     </div>
                 </div>
             </div>
+
+            <div id="readonly-banner" class="readonly-banner hidden" data-i18n="readOnlyChannel">Только администраторы могут писать сюда</div>
         </div>
     </main>
 </div>
@@ -359,13 +426,14 @@
 <script>
     const socket = io();
     let currentUser = null;
-    let selectedChatId = null; // Ранее selectedUser
+    let selectedChatId = null;
     let isCurrentChatGroup = false;
     let replyData = null;
     let viewingUserProfile = null;
-    let viewingUserType = 'user'; // 'user' или 'group'
+    let viewingEntityData = null; // Для хранения полных данных текущего просматриваемого профиля
     let unreadCounts = {}; 
     let currentGroupAvatarBase64 = null;
+    let editModeGroupId = null; // Для модалки редактирования
 
     const messagesDiv = document.getElementById('messages');
     const searchInput = document.getElementById('searchUser');
@@ -374,6 +442,8 @@
     const micBtn = document.getElementById('micBtn');
     const attachBtn = document.getElementById('attachBtn');
     const recordUI = document.getElementById('record-ui');
+    const inputContainer = document.getElementById('input-container');
+    const readonlyBanner = document.getElementById('readonly-banner');
     const recordTimeDisplay = document.getElementById('record-time');
     const contactsDiv = document.getElementById('contacts');
     const mainContainer = document.getElementById('main-container');
@@ -392,8 +462,43 @@
 
     // --- Локализация ---
     const dict = {
-        ru: { writeMsg: "Написать", addContact: "В контакты", removeContact: "Из контактов", blockUser: "Заблокировать", unblockUser: "Разблокировать", aboutMe: "О себе", birthday: "День рождения", username: "Имя пользователя / ID", settings: "Настройки", choosePhoto: "Выбрать фото", general: "Основные", appearance: "Внешний вид", yourNameLabel: "ВАШЕ ИМЯ", aboutMeLabel: "О СЕБЕ", birthdayLabel: "ДЕНЬ РОЖДЕНИЯ", saveChanges: "Сохранить изменения", logout: "Выйти из аккаунта", languageLabel: "ЯЗЫК / LANGUAGE", themeLabel: "ЦВЕТОВАЯ ТЕМА", chatPatternLabel: "УЗОР ФОНА ЧАТА", profilePatternLabel: "УЗОР ОБЛОЖКИ ПРОФИЛЯ", noPattern: "Без узора", patternDots: "Точки", patternGrid: "Сетка", patternTelegram: "Telegram Pattern", searchPlaceholder: "Поиск @ID...", savedMessages: "Избранное", savedSubtext: "Личное хранилище", selectChat: "Выберите чат", secureMessages: "Ваши сообщения защищены Aura", writeMessage: "Напишите сообщение...", swipeCancel: "Свайп для отмены", wasRecently: "был(а) недавно", wasToday: "был(а) сегодня в", wasAt: "был(а)", online: "в сети", typing: "печатает...", blockedStatus: "был(а) очень давно", notSpecified: "Не указан", notFound: "Чат не найден", profileUpdated: "Профиль обновлен!", photoUpdated: "Фото обновлено!", reply: "Ответить", delete: "Удалить", groupMembersLimit: "до 100 участников", createGroup: "Создать группу", groupUsername: "Идентификатор группы (без @)", groupName: "Название группы", groupDesc: "Описание", addMembers: "Добавить участников", createGroupBtn: "Создать", customNameLabel: "Имя контакта", saveContactBtn: "Сохранить", addContactTitle: "Добавить контакт", addContactDesc: "Введите имя, под которым этот пользователь будет отображаться у вас.", membersCount: "Участников", leaveGroup: "Покинуть группу", groupCreated: "Группа создана!" },
-        en: { writeMsg: "Message", addContact: "Add Contact", removeContact: "Remove Contact", blockUser: "Block", unblockUser: "Unblock", aboutMe: "Bio", birthday: "Birthday", username: "Username / ID", settings: "Settings", choosePhoto: "Choose Photo", general: "General", appearance: "Appearance", yourNameLabel: "YOUR NAME", aboutMeLabel: "BIO", birthdayLabel: "BIRTHDAY", saveChanges: "Save Changes", logout: "Log Out", languageLabel: "LANGUAGE / ЯЗЫК", themeLabel: "COLOR THEME", chatPatternLabel: "CHAT BACKGROUND PATTERN", profilePatternLabel: "PROFILE COVER PATTERN", noPattern: "No pattern", patternDots: "Dots", patternGrid: "Grid", patternTelegram: "Telegram Pattern", searchPlaceholder: "Search @ID...", savedMessages: "Saved Messages", savedSubtext: "Personal storage", selectChat: "Select a chat", secureMessages: "Your messages are secured by Aura", writeMessage: "Write a message...", swipeCancel: "Swipe to cancel", wasRecently: "last seen recently", wasToday: "last seen today at", wasAt: "last seen", online: "online", typing: "typing...", blockedStatus: "last seen a long time ago", notSpecified: "Not specified", notFound: "Chat not found", profileUpdated: "Profile updated!", photoUpdated: "Photo updated!", reply: "Reply", delete: "Delete", groupMembersLimit: "up to 100 members", createGroup: "Create Group", groupUsername: "Group ID (without @)", groupName: "Group Name", groupDesc: "Description", addMembers: "Add members", createGroupBtn: "Create", customNameLabel: "Contact Name", saveContactBtn: "Save", addContactTitle: "Add Contact", addContactDesc: "Enter the name under which this user will be displayed for you.", membersCount: "Members", leaveGroup: "Leave Group", groupCreated: "Group created!" }
+        ru: { 
+            writeMsg: "Написать", addContact: "В контакты", removeContact: "Из контактов", blockUser: "Заблокировать", unblockUser: "Разблокировать", 
+            aboutMe: "О себе", birthday: "День рождения", locationLabel: "Город / Локация", websiteLabel: "Веб-сайт", username: "Имя пользователя / ID", settings: "Настройки", choosePhoto: "Выбрать фото", 
+            general: "Профиль", appearance: "Внешний вид", yourNameLabel: "ВАШЕ ИМЯ", aboutMeLabel: "О СЕБЕ", birthdayLabel: "ДЕНЬ РОЖДЕНИЯ", 
+            saveChanges: "Сохранить изменения", logout: "Выйти из аккаунта", languageLabel: "ЯЗЫК / LANGUAGE", themeLabel: "ЦВЕТОВАЯ ТЕМА", 
+            chatPatternLabel: "УЗОР ФОНА ЧАТА", profilePatternLabel: "УЗОР ОБЛОЖКИ ПРОФИЛЯ", noPattern: "Без узора", patternDots: "Точки", 
+            patternGrid: "Сетка", patternTelegram: "Telegram Pattern", searchPlaceholder: "Поиск @ID...", savedMessages: "Избранное", 
+            savedSubtext: "Личное хранилище", selectChat: "Выберите чат", secureMessages: "Ваши сообщения защищены Aura", 
+            writeMessage: "Напишите сообщение...", swipeCancel: "Свайп для отмены", wasRecently: "был(а) недавно", wasToday: "был(а) сегодня в", 
+            wasAt: "был(а)", online: "в сети", typing: "печатает...", blockedStatus: "был(а) очень давно", notSpecified: "Не указан", 
+            notFound: "Чат не найден", profileUpdated: "Профиль обновлен!", photoUpdated: "Фото обновлено!", reply: "Ответить", delete: "Удалить", 
+            createGroup: "Создать сообщество", typeGroup: "Группа", typeChannel: "Канал", groupUsername: "Идентификатор (без @)", 
+            groupName: "Название", groupDesc: "Описание", addMembers: "Добавить участников", createGroupBtn: "Создать", saveBtn: "Сохранить",
+            customNameLabel: "Имя контакта", saveContactBtn: "Сохранить", addContactTitle: "Добавить контакт", 
+            addContactDesc: "Введите имя, под которым этот пользователь будет отображаться у вас.", membersCount: "Участников", 
+            leaveGroup: "Покинуть", groupCreated: "Создано!", readOnlyChannel: "Только администраторы могут писать сюда", kickBtn: "Удалить",
+            glassEffectLabel: "ЭФФЕКТ ЖИДКОГО СТЕКЛА", on: "Вкл", off: "Выкл"
+        },
+        en: { 
+            writeMsg: "Message", addContact: "Add Contact", removeContact: "Remove Contact", blockUser: "Block", unblockUser: "Unblock", 
+            aboutMe: "Bio", birthday: "Birthday", locationLabel: "Location", websiteLabel: "Website", username: "Username / ID", settings: "Settings", choosePhoto: "Choose Photo", 
+            general: "Profile", appearance: "Appearance", yourNameLabel: "YOUR NAME", aboutMeLabel: "BIO", birthdayLabel: "BIRTHDAY", 
+            saveChanges: "Save Changes", logout: "Log Out", languageLabel: "LANGUAGE / ЯЗЫК", themeLabel: "COLOR THEME", 
+            chatPatternLabel: "CHAT BACKGROUND PATTERN", profilePatternLabel: "PROFILE COVER PATTERN", noPattern: "No pattern", 
+            patternDots: "Dots", patternGrid: "Grid", patternTelegram: "Telegram Pattern", searchPlaceholder: "Search @ID...", 
+            savedMessages: "Saved Messages", savedSubtext: "Personal storage", selectChat: "Select a chat", 
+            secureMessages: "Your messages are secured by Aura", writeMessage: "Write a message...", swipeCancel: "Swipe to cancel", 
+            wasRecently: "last seen recently", wasToday: "last seen today at", wasAt: "last seen", online: "online", typing: "typing...", 
+            blockedStatus: "last seen a long time ago", notSpecified: "Not specified", notFound: "Chat not found", 
+            profileUpdated: "Profile updated!", photoUpdated: "Photo updated!", reply: "Reply", delete: "Delete", 
+            createGroup: "Create Community", typeGroup: "Group", typeChannel: "Channel", groupUsername: "ID (without @)", 
+            groupName: "Name", groupDesc: "Description", addMembers: "Add members", createGroupBtn: "Create", saveBtn: "Save",
+            customNameLabel: "Contact Name", saveContactBtn: "Save", addContactTitle: "Add Contact", 
+            addContactDesc: "Enter the name under which this user will be displayed for you.", membersCount: "Members", 
+            leaveGroup: "Leave", groupCreated: "Created!", readOnlyChannel: "Only administrators can post here", kickBtn: "Kick",
+            glassEffectLabel: "LIQUID GLASS EFFECT", on: "On", off: "Off"
+        }
     };
 
     let currentLang = 'ru';
@@ -476,6 +581,8 @@
             
             document.getElementById('edit-display-name').value = currentUser.name || '';
             document.getElementById('edit-bio').value = currentUser.bio || ''; 
+            document.getElementById('edit-location').value = currentUser.location || ''; 
+            document.getElementById('edit-website').value = currentUser.website || ''; 
             document.getElementById('edit-birthday').value = currentUser.birthday || '';
             
             applySavedPreferences(); 
@@ -521,11 +628,14 @@
             headerAvatar.innerHTML = '<i class="fas fa-bookmark"></i>'; 
             headerAvatar.style.background = 'var(--primary)';
             updateChatStatus('me', false);
+
+            inputContainer.classList.remove('hidden'); 
+            readonlyBanner.classList.add('hidden');
         } else {
             const res = await fetch(`/api/entity/${chatId}`); 
             const data = await res.json(); 
             
-            isCurrentChatGroup = data.type === 'group';
+            isCurrentChatGroup = (data.type === 'group' || data.type === 'channel');
             document.getElementById('chat-with-title').textContent = data.displayName || data.name || chatId;
             document.getElementById('chat-header-info').onclick = () => viewUserProfile(chatId);
             
@@ -543,6 +653,16 @@
                 headerAvatar.style.background = 'var(--primary)'; 
                 headerAvatar.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); 
             }
+
+            // Логика блокировки ввода для каналов
+            if (data.type === 'channel' && !data.isCreator) {
+                inputContainer.classList.add('hidden'); 
+                readonlyBanner.classList.remove('hidden');
+            } else {
+                inputContainer.classList.remove('hidden'); 
+                readonlyBanner.classList.add('hidden');
+            }
+
             updateContactsUI(chatId); 
             updateChatStatus(chatId, isCurrentChatGroup, data.isOnline, data.lastSeen, data.membersCount);
         }
@@ -737,10 +857,11 @@
 
     // --- SOCKET СОБЫТИЯ ---
     socket.on('user_status_change', (data) => {
-        if (data.username === selectedChatId) updateChatStatus(data.username, false, data.online, data.lastSeen);
+        if (data.username === selectedChatId && !isCurrentChatGroup) updateChatStatus(data.username, false, data.online, data.lastSeen);
         
-        const pUsername = document.getElementById('p-username').textContent;
-        if (pUsername === '@' + data.username && viewingUserType === 'user') document.getElementById('p-status').textContent = data.lastSeen === 'blocked' ? dict[currentLang].blockedStatus : (data.online ? dict[currentLang].online : formatLastSeen(data.lastSeen));
+        if (viewingUserProfile === data.username && viewingEntityData && viewingEntityData.type === 'user') {
+            document.getElementById('p-status').textContent = data.lastSeen === 'blocked' ? dict[currentLang].blockedStatus : (data.online ? dict[currentLang].online : formatLastSeen(data.lastSeen));
+        }
         
         const dot = document.getElementById(`online-dot-${data.username}`); 
         if (dot) dot.style.display = (data.online && data.lastSeen !== 'blocked') ? 'block' : 'none';
@@ -771,14 +892,14 @@
             renderMsg(msg);
             if (msg.from !== currentUser.username) {
                 document.getElementById('snd-notify').play().catch(()=>{});
-                socket.emit('mark_read', { chatWith: msg.to === currentUser.username ? msg.from : msg.to }); // Если группа, читаем группу
+                socket.emit('mark_read', { chatWith: msg.to === currentUser.username ? msg.from : msg.to }); 
                 socket.emit('stop_typing', { to: selectedChatId });
             } else {
                 document.getElementById('snd-send').play().catch(()=>{});
             }
         } else {
             document.getElementById('snd-notify').play().catch(()=>{});
-            const chatIdForUnread = msg.to === currentUser.username ? msg.from : msg.to; // От кого или из какой группы
+            const chatIdForUnread = msg.to === currentUser.username ? msg.from : msg.to; 
             
             if(msg.from !== currentUser.username) {
                 unreadCounts[chatIdForUnread] = (unreadCounts[chatIdForUnread] || 0) + 1;
@@ -810,6 +931,21 @@
         toggleCreateGroupModal(false);
         socket.emit('get_my_chats');
         openChat(data.groupId);
+    });
+
+    socket.on('group_updated', (data) => { 
+        if(selectedChatId === data.groupId) openChat(data.groupId); 
+        if(viewingUserProfile === data.groupId) viewUserProfile(data.groupId);
+        updateContactsUI(data.groupId);
+    });
+
+    socket.on('kicked_from_group', (data) => {
+        showToast("Вы были исключены из чата");
+        if(selectedChatId === data.groupId) { 
+            document.getElementById('chat-ui').classList.add('hidden'); 
+            document.getElementById('welcome-screen').classList.remove('hidden'); 
+        }
+        socket.emit('get_my_chats');
     });
 
     searchInput.onkeypress = (e) => { if (e.key === 'Enter' && searchInput.value.trim()) { socket.emit('search_user', searchInput.value.trim().replace('@', '')); } };
@@ -864,9 +1000,22 @@
     }
 
     async function saveProfileChanges() {
-        const newName = document.getElementById('edit-display-name').value; const newBio = document.getElementById('edit-bio').value; const newBirthday = document.getElementById('edit-birthday').value;
-        const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName, bio: newBio, birthday: newBirthday }) });
-        if (res.ok) { currentUser.name = newName; currentUser.bio = newBio; currentUser.birthday = newBirthday; updateHeaderUI(); showToast(dict[currentLang].profileUpdated); }
+        const newName = document.getElementById('edit-display-name').value; 
+        const newBio = document.getElementById('edit-bio').value; 
+        const newBirthday = document.getElementById('edit-birthday').value;
+        const newLocation = document.getElementById('edit-location').value;
+        const newWebsite = document.getElementById('edit-website').value;
+
+        const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName, bio: newBio, birthday: newBirthday, location: newLocation, website: newWebsite }) });
+        if (res.ok) { 
+            currentUser.name = newName; 
+            currentUser.bio = newBio; 
+            currentUser.birthday = newBirthday; 
+            currentUser.location = newLocation;
+            currentUser.website = newWebsite;
+            updateHeaderUI(); 
+            showToast(dict[currentLang].profileUpdated); 
+        }
     }
 
     function uploadAvatar(input) {
@@ -880,18 +1029,18 @@
         }; reader.readAsDataURL(file);
     }
 
-    // Универсальный просмотр профиля (Юзер или Группа)
+    // Универсальный просмотр профиля (Юзер или Группа/Канал)
     async function viewUserProfile(chatId) {
         viewingUserProfile = chatId; 
         const res = await fetch(`/api/entity/${chatId}`); 
         const data = await res.json();
         
-        viewingUserType = data.type; // 'user' или 'group'
+        viewingEntityData = data; 
         
         document.getElementById('p-name').textContent = data.displayName || data.name || chatId; 
         document.getElementById('p-username').textContent = '@' + chatId;
         document.getElementById('p-bio').textContent = data.bio || data.description || dict[currentLang].notSpecified; 
-        document.getElementById('p-bio-label').textContent = data.type === 'group' ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
+        document.getElementById('p-bio-label').textContent = (data.type === 'group' || data.type === 'channel') ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
         
         const pAvatar = document.getElementById('p-avatar');
         if (data.isBlocked) { pAvatar.style.backgroundImage = 'none'; pAvatar.style.background = 'var(--bg-hover)'; pAvatar.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } 
@@ -901,43 +1050,89 @@
         document.getElementById('p-cover').className = `profile-cover pattern-${data.profilePattern || 'none'}`;
         document.getElementById('p-btn-message').onclick = () => { toggleProfileModal(false); openChat(chatId); };
         
-        if (data.type === 'group') {
-            document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()}`;
+        const showField = (id, val) => { 
+            const el = document.getElementById(id); 
+            if(val) { 
+                el.classList.remove('hidden'); 
+                el.querySelector('.detail-value').textContent = val; 
+                if(id==='p-row-website') el.querySelector('.detail-value').href = val.startsWith('http') ? val : 'https://' + val;
+            } else { 
+                el.classList.add('hidden'); 
+            } 
+        };
+
+        if (data.type === 'group' || data.type === 'channel') {
+            document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()} (${data.type === 'channel' ? dict[currentLang].typeChannel : dict[currentLang].typeGroup})`;
+            
             document.getElementById('p-row-birthday').classList.add('hidden');
+            showField('p-row-location', null); 
+            showField('p-row-website', null);
+            
             document.getElementById('p-row-members').classList.remove('hidden');
             document.getElementById('p-members-count').textContent = data.membersCount;
             
+            // Админка
+            if(data.isCreator) { 
+                document.getElementById('p-btn-edit').classList.remove('hidden'); 
+            } else { 
+                document.getElementById('p-btn-edit').classList.add('hidden'); 
+            }
+            
+            const mList = document.getElementById('p-members-list'); 
+            mList.innerHTML = ''; 
+            mList.style.display = 'block';
+            
+            data.membersList.forEach(m => {
+                const isMe = m.username === currentUser.username;
+                const kickBtn = (data.isCreator && !isMe) ? `<button class="danger-btn-small" onclick="kickMember('${data.id}', '${m.username}')">${dict[currentLang].kickBtn}</button>` : '';
+                mList.innerHTML += `
+                    <div class="member-option" style="cursor:default">
+                        <span>${m.name} (@${m.username})</span>
+                        ${kickBtn}
+                    </div>`;
+            });
+
             document.getElementById('p-btn-contact').classList.add('hidden');
             document.getElementById('p-btn-block').classList.add('hidden');
             document.getElementById('p-btn-leave').classList.remove('hidden');
         } else {
             document.getElementById('p-status').textContent = data.isBlocked ? dict[currentLang].blockedStatus : (data.isOnline ? dict[currentLang].online : formatLastSeen(data.lastSeen));
-            document.getElementById('p-row-birthday').classList.remove('hidden');
+            
             document.getElementById('p-row-members').classList.add('hidden');
-            document.getElementById('p-birthday').textContent = data.birthday ? new Date(data.birthday).toLocaleDateString() : dict[currentLang].notSpecified;
+            document.getElementById('p-members-list').style.display = 'none';
+            document.getElementById('p-btn-edit').classList.add('hidden');
+            
+            showField('p-row-birthday', data.birthday ? new Date(data.birthday).toLocaleDateString() : null);
+            showField('p-row-location', data.location); 
+            showField('p-row-website', data.website);
             
             document.getElementById('p-btn-contact').classList.remove('hidden');
             document.getElementById('p-btn-block').classList.remove('hidden');
             document.getElementById('p-btn-leave').classList.add('hidden');
             
             updateProfileContactBtn(data.inContacts);
-            const myRes = await fetch('/my-full-profile'); const myData = await myRes.json();
+            const myRes = await fetch('/my-full-profile'); 
+            const myData = await myRes.json();
             updateProfileBlockBtn(myData.blocked && myData.blocked.includes(chatId)); 
         }
 
         toggleProfileModal(true);
     }
 
+    function kickMember(groupId, userId) {
+        if(confirm("Удалить пользователя из сообщества?")) {
+            socket.emit('kick_member', { groupId, userId });
+        }
+    }
+
     // --- ЛОГИКА КАСТОМНЫХ КОНТАКТОВ ---
     function toggleContact() { 
-        if(!viewingUserProfile || viewingUserType === 'group') return;
+        if(!viewingUserProfile || (viewingEntityData && viewingEntityData.type !== 'user')) return;
         
         const isContact = document.getElementById('p-icon-contact').className.includes('user-minus');
         if (isContact) {
-            // Удаляем из контактов без модалки
             socket.emit('toggle_contact', {username: viewingUserProfile, remove: true});
         } else {
-            // Открываем модалку для добавления кастомного имени
             const currentName = document.getElementById('p-name').textContent;
             document.getElementById('contact-custom-name').value = currentName;
             document.getElementById('custom-contact-modal').classList.remove('hidden');
@@ -951,11 +1146,15 @@
         closeModalOnOuterClick({target: {id: 'custom-contact-modal'}}, 'custom-contact-modal');
     }
 
-    function toggleBlock() { if(viewingUserProfile && viewingUserType === 'user') socket.emit('toggle_block', {username: viewingUserProfile}); }
+    function toggleBlock() { 
+        if(viewingUserProfile && viewingEntityData && viewingEntityData.type === 'user') {
+            socket.emit('toggle_block', {username: viewingUserProfile}); 
+        }
+    }
     
     function leaveGroup() {
-        if(viewingUserProfile && viewingUserType === 'group') {
-            if(confirm("Вы уверены, что хотите покинуть группу?")) {
+        if(viewingUserProfile && viewingEntityData && viewingEntityData.type !== 'user') {
+            if(confirm("Вы уверены, что хотите покинуть?")) {
                 socket.emit('leave_group', { groupId: viewingUserProfile });
                 toggleProfileModal(false);
                 if(selectedChatId === viewingUserProfile) {
@@ -978,44 +1177,59 @@
         else { icon.className = 'fas fa-ban'; text.textContent = dict[currentLang].blockUser; btn.classList.add('block-btn'); btn.style.color = '#ff3b30'; }
     }
 
-    // --- ЛОГИКА СОЗДАНИЯ ГРУПП ---
-    async function toggleCreateGroupModal(show) {
+    // --- ЛОГИКА СОЗДАНИЯ И РЕДАКТИРОВАНИЯ СООБЩЕСТВ ---
+    async function toggleCreateGroupModal(show, editMode = false) {
         const modal = document.getElementById('create-group-modal');
         if (show) {
-            // Загружаем контакты для выбора
-            const list = document.getElementById('group-members-list');
-            list.innerHTML = '';
+            editModeGroupId = editMode ? viewingEntityData.id : null;
+            document.getElementById('modal-group-title').textContent = editMode ? "Редактировать" : dict[currentLang].createGroup;
+            document.getElementById('submit-group-btn').textContent = editMode ? dict[currentLang].saveBtn : dict[currentLang].createGroupBtn;
             
-            // Получаем список контактов с их именами
-            const res = await fetch('/my-full-profile');
-            const data = await res.json();
-            
-            if (data.contacts && data.contacts.length > 0) {
-                for (let contact of data.contacts) {
-                    const cUsername = typeof contact === 'object' ? contact.username : contact;
-                    const cName = typeof contact === 'object' && contact.customName ? contact.customName : cUsername;
-                    list.innerHTML += `
-                        <label class="member-option">
-                            <input type="checkbox" value="${cUsername}">
-                            <span>${cName} (@${cUsername})</span>
-                        </label>
-                    `;
-                }
+            if (editMode) {
+                document.getElementById('group-type-selector').style.display = 'none';
+                document.getElementById('group-id-wrapper').style.display = 'none';
+                document.getElementById('group-members-wrapper').style.display = 'none';
+                
+                document.getElementById('group-name-input').value = viewingEntityData.name;
+                document.getElementById('group-desc-input').value = viewingEntityData.description;
+                currentGroupAvatarBase64 = viewingEntityData.avatar;
+                document.getElementById('group-avatar-preview').style.backgroundImage = currentGroupAvatarBase64 ? `url(${currentGroupAvatarBase64})` : 'none';
             } else {
-                list.innerHTML = `<div style="padding: 10px; color: var(--text-dim); font-size: 0.85rem;">Нет контактов для добавления</div>`;
+                document.getElementById('group-type-selector').style.display = 'flex';
+                document.getElementById('group-id-wrapper').style.display = 'flex';
+                document.getElementById('group-members-wrapper').style.display = 'flex';
+                
+                document.getElementById('group-id-input').value = ''; 
+                document.getElementById('group-name-input').value = ''; 
+                document.getElementById('group-desc-input').value = '';
+                document.getElementById('group-avatar-preview').style.backgroundImage = 'none'; 
+                currentGroupAvatarBase64 = null;
+                
+                const list = document.getElementById('group-members-list'); list.innerHTML = '';
+                const res = await fetch('/my-full-profile'); const data = await res.json();
+                
+                if (data.contacts && data.contacts.length > 0) {
+                    for (let contact of data.contacts) {
+                        const cUsername = typeof contact === 'object' ? contact.username : contact; 
+                        const cName = typeof contact === 'object' && contact.customName ? contact.customName : cUsername;
+                        list.innerHTML += `
+                            <label class="member-option">
+                                <span>${cName} (@${cUsername})</span>
+                                <input type="checkbox" value="${cUsername}">
+                            </label>`;
+                    }
+                } else { 
+                    list.innerHTML = `<div style="padding: 10px; color: var(--text-dim); font-size: 0.85rem;">Нет контактов для добавления</div>`; 
+                }
             }
-
-            // Очищаем форму
-            document.getElementById('group-id-input').value = '';
-            document.getElementById('group-name-input').value = '';
-            document.getElementById('group-desc-input').value = '';
-            document.getElementById('group-avatar-preview').style.backgroundImage = 'none';
-            currentGroupAvatarBase64 = null;
-
             modal.classList.remove('hidden'); setTimeout(() => modal.classList.add('show'), 10);
-        } else {
-            modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300);
+        } else { 
+            modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); 
         }
+    }
+
+    function openEditGroupModal() { 
+        toggleCreateGroupModal(true, true); 
     }
 
     function previewGroupAvatar(input) {
@@ -1028,18 +1242,28 @@
     }
 
     function submitCreateGroup() {
-        const id = document.getElementById('group-id-input').value.trim();
         const name = document.getElementById('group-name-input').value.trim();
         const desc = document.getElementById('group-desc-input').value.trim();
         
-        if (!id || !name) { showToast("Укажите ID и Название группы"); return; }
+        if (editModeGroupId) {
+            if(!name) { showToast("Укажите название"); return; }
+            socket.emit('update_group_info', { id: editModeGroupId, name: name, description: desc, avatar: currentGroupAvatarBase64 });
+            toggleCreateGroupModal(false); 
+            showToast("Изменения сохранены");
+            return;
+        }
+
+        const id = document.getElementById('group-id-input').value.trim();
+        const type = document.querySelector('input[name="chat-type"]:checked').value;
+        
+        if (!id || !name) { showToast("Укажите ID и Название"); return; }
         
         const checkboxes = document.querySelectorAll('#group-members-list input[type="checkbox"]:checked');
         const members = Array.from(checkboxes).map(cb => cb.value);
         
         if (members.length > 99) { showToast("Максимум 99 участников (плюс вы)"); return; }
 
-        socket.emit('create_group', { id: id, name: name, description: desc, avatar: currentGroupAvatarBase64, members: members });
+        socket.emit('create_group', { id: id, type: type, name: name, description: desc, avatar: currentGroupAvatarBase64, members: members });
     }
 
     function startReply(username, text) {
@@ -1048,17 +1272,41 @@
         document.getElementById('reply-text').innerText = text;
         document.getElementById('reply-preview').classList.remove('hidden'); msgInput.focus();
     }
-    function cancelReply() { replyData = null; document.getElementById('reply-preview').classList.add('hidden'); }
+    
+    function cancelReply() { 
+        replyData = null; 
+        document.getElementById('reply-preview').classList.add('hidden'); 
+    }
     
     function applySavedPreferences() {
-        const theme = localStorage.getItem('aura-theme') || 'dark'; const pattern = localStorage.getItem('aura-pattern') || 'none'; const lang = localStorage.getItem('aura-lang') || 'ru';
-        changeTheme(theme); changePattern(pattern); changeLanguage(lang);
-        document.getElementById('theme-select').value = theme; document.getElementById('pattern-select').value = pattern; document.getElementById('lang-select').value = lang;
+        const theme = localStorage.getItem('aura-theme') || 'dark'; 
+        const pattern = localStorage.getItem('aura-pattern') || 'none'; 
+        const lang = localStorage.getItem('aura-lang') || 'ru';
+        const glass = localStorage.getItem('aura-glass') || 'off';
+        
+        changeTheme(theme); changePattern(pattern); changeLanguage(lang); changeGlassEffect(glass);
+        
+        document.getElementById('theme-select').value = theme; 
+        document.getElementById('pattern-select').value = pattern; 
+        document.getElementById('lang-select').value = lang;
+        document.getElementById('glass-select').value = glass;
+
         if(currentUser && currentUser.profilePattern) document.getElementById('profile-pattern-select').value = currentUser.profilePattern;
     }
 
     function changeTheme(themeName) { document.documentElement.setAttribute('data-theme', themeName); localStorage.setItem('aura-theme', themeName); }
     function changePattern(p) { document.getElementById('app-body').className = `pattern-${p}`; localStorage.setItem('aura-pattern', p); }
+    function changeGlassEffect(state) {
+        if (state === 'on') {
+            document.documentElement.setAttribute('data-glass', 'on');
+            document.getElementById('liquid-bg').classList.remove('hidden');
+        } else {
+            document.documentElement.removeAttribute('data-glass');
+            document.getElementById('liquid-bg').classList.add('hidden');
+        }
+        localStorage.setItem('aura-glass', state);
+    }
+
     async function changeProfilePattern(p) {
         document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${p}`;
         await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ profilePattern: p }) });
@@ -1082,9 +1330,14 @@
     }
 
     function switchSettingsTab(tabId) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const btn = document.querySelector(`.tab-btn[onclick="switchSettingsTab('${tabId}')"]`); const content = document.getElementById(`tab-${tabId}`);
-        if(btn) btn.classList.add('active'); if(content) content.classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        const btn = document.querySelector(`.tab-btn[onclick="switchSettingsTab('${tabId}')"]`); 
+        const content = document.getElementById(`tab-${tabId}`);
+        
+        if(btn) btn.classList.add('active'); 
+        if(content) content.classList.add('active');
     }
 
     sendBtn.onclick = send;
