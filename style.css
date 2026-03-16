@@ -557,7 +557,11 @@ body {
         z-index: 20; 
     }
     
-    .chat-open .sidebar { transform: translateX(-30%); opacity: 0.5; }
+    .chat-open .sidebar { 
+        transform: translateX(-100%); 
+        opacity: 0; 
+        visibility: hidden; /* Гарантирует, что сайдбар не просвечивает и не перехватывает клики */
+    }
     .chat-open .chat-area { left: 0; }
 
     .mobile-back-btn { display: block !important; margin-right: 10px; background: none; border: none; color: var(--text-dim); font-size: 1.2rem; }
@@ -565,10 +569,18 @@ body {
     .bubble { max-width: 85%; }
     .tg-style-profile { width: 95%; max-width: 380px; }
     
-    /* Для плавающего инпута на мобильных */
-    [data-glass="on"] .input-container {
+    /* Для плавающего инпута и реплея на мобильных */
+    [data-glass="on"] .input-container,
+    [data-glass="on"] .reply-preview {
         width: calc(100% - 20px) !important;
-        margin: 0 auto;
+    }
+    
+    [data-glass="on"] .input-container {
+        margin: 0 auto 10px auto !important;
+    }
+
+    [data-glass="on"] .reply-preview {
+        margin: 0 auto 10px auto !important;
     }
 }
 
@@ -625,7 +637,7 @@ body {
 }
 
 [data-glass="on"] .messages-container {
-    padding-bottom: 120px; /* Сообщения будут прокручиваться выше плавающего инпута */
+    padding-bottom: 20px; /* Уменьшили отступ, так как инпут теперь в потоке */
 }
 
 [data-glass="on"] .contacts-list {
@@ -645,10 +657,8 @@ body {
 
 /* FLOATING INPUT: Плавающая и скругленная панель ввода */
 [data-glass="on"] .input-container {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
+    margin: 0 auto 20px auto;
     width: calc(100% - 40px);
     max-width: 900px;
     background: color-mix(in srgb, var(--bg-sidebar) 40%, transparent);
@@ -657,6 +667,15 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 32px; /* Ультра-круглые края */
     box-shadow: 0 10px 30px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+/* Блок реплея в стеклянном режиме */
+[data-glass="on"] .reply-preview {
+    position: relative;
+    margin: 0 auto 10px auto;
+    width: calc(100% - 40px);
+    max-width: 900px;
+    border-radius: 16px;
 }
 
 [data-glass="on"] .input-container input {
