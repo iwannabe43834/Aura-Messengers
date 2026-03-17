@@ -3,84 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aura Messenger — Авторизация</title>
-    <link rel="manifest" href="manifest.json">
+    <title>Aura Messenger — Вход</title>
     <style>
-        /* Стиль в духе Telegram Web */
+        /* Оригинальные стили Aura */
         body {
-            background-color: #212121;
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
             margin: 0;
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100vh;
+            overflow: hidden;
         }
 
         .auth-card {
             width: 100%;
-            max-width: 360px;
-            padding: 20px;
+            max-width: 380px;
+            padding: 30px;
+            background: #1a1a1a;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             text-align: center;
-            box-sizing: border-box;
         }
 
         .auth-logo img {
-            width: 100px;
-            height: 100px;
-            margin-bottom: 25px;
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
             border-radius: 50%;
+            filter: grayscale(100%);
         }
 
-        h1 { font-size: 24px; font-weight: 600; margin-bottom: 10px; }
-        .subtitle { color: #aaaaaa; font-size: 15px; margin-bottom: 30px; }
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
 
         .input-group {
-            position: relative;
             margin-bottom: 15px;
-            border: 1px solid #2f2f2f;
-            border-radius: 12px;
-            padding: 10px 15px;
             text-align: left;
-            background: #212121;
         }
 
-        .input-group:focus-within { border-color: #8774e1; }
-        .input-group label { display: block; color: #8774e1; font-size: 12px; margin-bottom: 4px; font-weight: 600; }
+        .input-group label {
+            display: block;
+            color: #8774e1;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            margin-left: 5px;
+        }
+
         .input-group input {
             width: 100%;
-            background: transparent;
-            border: none;
-            color: #ffffff;
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 12px 15px;
+            color: #fff;
             font-size: 16px;
             outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            border-color: #8774e1;
         }
 
         .auth-btn {
             width: 100%;
             padding: 14px;
             background: #8774e1;
-            color: #ffffff;
+            color: #fff;
             border: none;
-            border-radius: 10px;
-            font-size: 15px;
+            border-radius: 12px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            text-transform: uppercase;
             margin-top: 10px;
+            transition: transform 0.2s, background 0.2s;
         }
 
-        .auth-btn:disabled { background: #555; cursor: not-allowed; }
-        .auth-btn.secondary { background: transparent; border: 1px solid #2f2f2f; margin-top: 15px; }
-        .text-link { color: #8774e1; font-size: 14px; display: inline-block; margin-top: 20px; cursor: pointer; }
-        .hidden { display: none !important; }
+        .auth-btn:hover {
+            background: #7a66cb;
+            transform: translateY(-1px);
+        }
 
-        #authCode {
+        .auth-btn:active {
+            transform: translateY(0);
+        }
+
+        .auth-btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+
+        .auth-btn.secondary {
+            background: transparent;
+            border: 1px solid #333;
+            margin-top: 12px;
+        }
+
+        .auth-btn.secondary:hover {
+            background: #222;
+            border-color: #444;
+        }
+
+        .text-link {
+            color: #8774e1;
+            font-size: 13px;
+            display: inline-block;
+            margin-top: 20px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .text-link:hover {
+            color: #a395e9;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Стиль для ввода кода */
+        #authCode, #resetCode {
             text-align: center;
             font-size: 24px;
-            letter-spacing: 10px;
-            font-weight: bold;
+            letter-spacing: 8px;
+            font-weight: 700;
+        }
+
+        .tg-info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            display: block;
         }
     </style>
 </head>
@@ -88,220 +159,326 @@
 
     <div class="auth-card">
         <div class="auth-logo">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="Aura Logo">
+            <img src="https://cdn-icons-png.flaticon.com/512/8943/8943377.png" alt="Aura Logo">
         </div>
 
-        <div id="stepWelcome">
+        <div id="stepIdentify">
             <h1>Aura Messenger</h1>
-            <p class="subtitle">Твой уголок безопасности</p>
-            <button class="auth-btn" onclick="startFlow('login')">ВОЙТИ</button>
-            <button class="auth-btn secondary" onclick="startFlow('register')">РЕГИСТРАЦИЯ</button>
-        </div>
-
-        <div id="stepEmail" class="hidden">
-            <h1 id="emailTitle">Вход</h1>
-            <p class="subtitle">Введите ваш E-mail для продолжения</p>
+            <p class="subtitle">Введите ваш Username или E-mail для входа</p>
             <div class="input-group">
-                <label>E-mail</label>
-                <input type="email" id="authEmail" placeholder="example@mail.com">
+                <label>Логин</label>
+                <input type="text" id="loginInput" placeholder="nickname или email">
             </div>
-            <button class="auth-btn" id="btnEmail" onclick="handleEmailSubmit()">ПРОДОЛЖИТЬ</button>
-            <span class="text-link" onclick="showStep('stepWelcome')">Назад</span>
+            <button class="auth-btn" id="btnIdentify" onclick="identifyUser()">ПРОДОЛЖИТЬ</button>
+            <button class="auth-btn secondary" onclick="showStep('stepRegister')">СОЗДАТЬ АККАУНТ</button>
         </div>
 
-        <div id="stepLoginMethod" class="hidden">
-            <h1>Как войти?</h1>
-            <p class="subtitle">Выберите удобный способ авторизации</p>
-            <button class="auth-btn" onclick="sendCodeAndGo()">ПОЛУЧИТЬ КОД</button>
-            <button class="auth-btn secondary" onclick="showStep('stepPasswordLogin')">ВОЙТИ ПО ПАРОЛЮ</button>
-            <span class="text-link" onclick="showStep('stepEmail')">Назад</span>
+        <div id="stepChooseMethod" class="hidden">
+            <h1 id="welcomeUserText">С возвращением</h1>
+            <p class="subtitle">Выберите способ подтверждения личности</p>
+            
+            <button class="auth-btn" onclick="showStep('stepPasswordLogin')">ВОЙТИ ПО ПАРОЛЮ</button>
+            
+            <button class="auth-btn secondary hidden" id="btnMethodTg" onclick="requestAuthCode('telegram')">КОД В TELEGRAM</button>
+            <button class="auth-btn secondary hidden" id="btnMethodEmail" onclick="requestAuthCode('email')">КОД НА E-MAIL</button>
+            
+            <span class="text-link" onclick="showStep('stepIdentify')">Это не я</span>
         </div>
 
         <div id="stepPasswordLogin" class="hidden">
-            <h1>Пароль</h1>
-            <p class="subtitle">Введите ваш пароль от аккаунта</p>
+            <h1>Введите пароль</h1>
+            <p class="subtitle">Используйте ваш постоянный пароль</p>
             <div class="input-group">
                 <label>Пароль</label>
                 <input type="password" id="loginPass" placeholder="••••••••">
             </div>
             <button class="auth-btn" id="btnLoginPass" onclick="loginWithPassword()">ВОЙТИ</button>
-            <span class="text-link" onclick="showStep('stepLoginMethod')">Назад</span>
+            <div style="display: flex; justify-content: space-around;">
+                <span class="text-link" onclick="initPasswordReset()">Забыли пароль?</span>
+                <span class="text-link" onclick="showStep('stepChooseMethod')">Назад</span>
+            </div>
         </div>
 
         <div id="stepCode" class="hidden">
-            <h1>Код из письма</h1>
-            <p class="subtitle">Мы отправили код на <br><b id="userEmailLabel" style="color: #fff;"></b></p>
+            <h1>Код доступа</h1>
+            <p class="subtitle" id="codeSubtitle">Мы отправили секретный код</p>
             <div class="input-group">
-                <label>Код подтверждения</label>
-                <input type="text" id="authCode" placeholder="----" maxlength="4">
+                <label>4-значный код</label>
+                <input type="text" id="authCode" placeholder="0000" maxlength="4">
             </div>
             <button class="auth-btn" id="btnVerify" onclick="verifyCode()">ПОДТВЕРДИТЬ</button>
-            <span class="text-link" onclick="showStep('stepEmail')">Изменить почту</span>
+            <span class="text-link" onclick="showStep('stepChooseMethod')">Изменить способ</span>
         </div>
 
-        <div id="stepProfile" class="hidden">
-            <h1>Создать профиль</h1>
-            <p class="subtitle">Вас нет в системе, давайте это исправим</p>
+        <div id="stepResetPassword" class="hidden">
+            <h1>Восстановление</h1>
+            <p class="subtitle">Введите код из Telegram и новый пароль</p>
             <div class="input-group">
-                <label>Ваше имя</label>
-                <input type="text" id="regFullName" placeholder="Иван Иванов">
+                <label>Код подтверждения</label>
+                <input type="text" id="resetCode" placeholder="0000" maxlength="4">
             </div>
             <div class="input-group">
-                <label>Username</label>
-                <input type="text" id="regUsername" placeholder="nickname">
+                <label>Новый пароль</label>
+                <input type="password" id="resetPass" placeholder="Минимум 6 символов">
+            </div>
+            <button class="auth-btn" id="btnReset" onclick="resetPassword()">ОБНОВИТЬ И ВОЙТИ</button>
+            <span class="text-link" onclick="showStep('stepPasswordLogin')">Отмена</span>
+        </div>
+
+        <div id="stepRegister" class="hidden">
+            <h1>Регистрация</h1>
+            <p class="subtitle">Создайте новый аккаунт Aura</p>
+            <div class="input-group">
+                <label>Username (логин)*</label>
+                <input type="text" id="regUsername" placeholder="Например: alex_aura">
             </div>
             <div class="input-group">
-                <label>Придумайте пароль</label>
-                <input type="password" id="regPass" placeholder="Минимум 6 знаков">
+                <label>Ваше имя*</label>
+                <input type="text" id="regFullName" placeholder="Александр">
             </div>
-            <button class="auth-btn" id="btnRegister" onclick="finishRegistration()">НАЧАТЬ ОБЩЕНИЕ</button>
+            <div class="input-group">
+                <label>Telegram (для кодов)</label>
+                <input type="text" id="regTelegram" placeholder="@username">
+                <span class="tg-info">Нужно будет написать /start боту</span>
+            </div>
+            <div class="input-group">
+                <label>E-mail (опционально)</label>
+                <input type="email" id="regEmail" placeholder="email@example.com">
+            </div>
+            <div class="input-group">
+                <label>Пароль*</label>
+                <input type="password" id="regPass" placeholder="Минимум 6 символов">
+            </div>
+            <button class="auth-btn" id="btnRegister" onclick="finishRegistration()">ЗАРЕГИСТРИРОВАТЬСЯ</button>
+            <span class="text-link" onclick="showStep('stepIdentify')">Уже есть аккаунт?</span>
         </div>
     </div>
 
     <script>
-        let currentFlow = ''; // 'login' или 'register'
-    let currentEmail = '';
+        let identifiedUsername = ''; // Хранит чистый username найденного юзера
+        let currentLoginId = '';    // То, что ввел пользователь изначально
+        let canResetViaTelegram = false;
 
-    // Переключение экранов
-    function showStep(stepId) {
-        document.querySelectorAll('.auth-card > div').forEach(div => {
-            if (!div.classList.contains('auth-logo')) div.classList.add('hidden');
-        });
-        const target = document.getElementById(stepId);
-        if (target) target.classList.remove('hidden');
-    }
-
-    // Старт
-    function startFlow(mode) {
-        currentFlow = mode;
-        document.getElementById('emailTitle').innerText = (mode === 'login') ? 'Вход' : 'Регистрация';
-        showStep('stepEmail');
-    }
-
-    // Шаг 1: Проверка почты
-    async function handleEmailSubmit() {
-        currentEmail = document.getElementById('authEmail').value.trim();
-        if (!currentEmail.includes('@')) return alert("Введите корректную почту!");
-
-        if (currentFlow === 'login') {
-            showStep('stepLoginMethod');
-        } else {
-            sendCodeAndGo(); 
+        function showStep(stepId) {
+            document.querySelectorAll('.auth-card > div:not(.auth-logo)').forEach(div => div.classList.add('hidden'));
+            const target = document.getElementById(stepId);
+            if(target) target.classList.remove('hidden');
         }
-    }
 
-    // Отправка кода
-    async function sendCodeAndGo() {
-        const btn = document.getElementById('btnEmail');
-        btn.disabled = true;
-        btn.innerText = "ОТПРАВКА...";
+        // 1. Поиск пользователя
+        async function identifyUser() {
+            const val = document.getElementById('loginInput').value.trim();
+            if (!val) return alert("Введите данные!");
 
-        try {
-            const response = await fetch('/api/send-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: currentEmail })
-            });
-            if (response.ok) {
-                document.getElementById('userEmailLabel').innerText = currentEmail;
-                showStep('stepCode');
-            } else {
-                alert("Ошибка при отправке кода.");
-            }
-        } catch (e) {
-            alert("Сервер не отвечает");
-        } finally {
-            btn.disabled = false;
-            btn.innerText = "ПРОДОЛЖИТЬ";
-        }
-    }
+            const btn = document.getElementById('btnIdentify');
+            btn.disabled = true;
 
-    // Вход по паролю
-    async function loginWithPassword() {
-        const password = document.getElementById('loginPass').value;
-        const btn = document.getElementById('btnLoginPass');
-        btn.disabled = true;
+            try {
+                const response = await fetch('/api/check-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ loginId: val })
+                });
+                const result = await response.json();
 
-        try {
-            const response = await fetch('/api/login-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: currentEmail, password })
-            });
-            const result = await response.json();
-            if (response.ok) {
-                localStorage.setItem('username', result.user.username);
-                window.location.href = "/index.html";
-            } else {
-                alert(result.error || "Ошибка входа");
-            }
-        } catch (e) {
-            alert("Ошибка сети");
-        } finally {
-            btn.disabled = false;
-        }
-    }
+                if (response.ok && result.exists) {
+                    currentLoginId = val;
+                    identifiedUsername = result.username;
+                    canResetViaTelegram = result.hasTelegram;
 
-    // Проверка кода
-    async function verifyCode() {
-        const code = document.getElementById('authCode').value.trim();
-        if (code.length < 4) return alert("Введите 4 цифры");
-        const btn = document.getElementById('btnVerify');
-        btn.disabled = true;
-
-        try {
-            const response = await fetch('/api/verify-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: currentEmail, code: code })
-            });
-            const result = await response.json();
-            if (response.ok) {
-                if (result.isNewUser) {
-                    showStep('stepProfile');
+                    document.getElementById('welcomeUserText').innerText = `@${result.username}`;
+                    
+                    // Показываем кнопки в зависимости от доступных данных
+                    document.getElementById('btnMethodEmail').classList.toggle('hidden', !result.hasEmail);
+                    document.getElementById('btnMethodTg').classList.toggle('hidden', !result.hasTelegram);
+                    
+                    showStep('stepChooseMethod');
                 } else {
+                    alert("Пользователь не найден. Проверьте логин или зарегистрируйтесь.");
+                }
+            } catch (e) {
+                alert("Ошибка связи с сервером");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // 2. Запрос кода
+        async function requestAuthCode(method, isReset = false) {
+            try {
+                const response = await fetch('/api/send-auth-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        username: identifiedUsername, 
+                        method: method,
+                        isReset: isReset
+                    })
+                });
+                
+                const res = await response.json();
+                if (response.ok) {
+                    if (isReset) {
+                        showStep('stepResetPassword');
+                    } else {
+                        document.getElementById('codeSubtitle').innerText = `Код отправлен в ${method === 'telegram' ? 'Telegram' : 'E-mail'}`;
+                        document.getElementById('authCode').value = '';
+                        showStep('stepCode');
+                    }
+                } else {
+                    alert(res.error || "Не удалось отправить код");
+                }
+            } catch (e) {
+                alert("Ошибка сети");
+            }
+        }
+
+        // 3. Вход по паролю
+        async function loginWithPassword() {
+            const pass = document.getElementById('loginPass').value;
+            if (!pass) return alert("Введите пароль");
+
+            const btn = document.getElementById('btnLoginPass');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/login-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ loginId: currentLoginId, password: pass })
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
                     localStorage.setItem('username', result.user.username);
                     window.location.href = "/index.html";
+                } else {
+                    alert(result.error || "Неверный пароль");
                 }
-            } else {
-                alert(result.error || "Неверный код!");
+            } catch (e) {
+                alert("Ошибка авторизации");
+            } finally {
+                btn.disabled = false;
             }
-        } catch (e) {
-            alert("Ошибка сервера");
-        } finally {
-            btn.disabled = false;
         }
-    }
 
-    // Регистрация
-    async function finishRegistration() {
-        const name = document.getElementById('regFullName').value.trim();
-        const user = document.getElementById('regUsername').value.trim();
-        const pass = document.getElementById('regPass').value;
+        // 4. Проверка кода (2FA)
+        async function verifyCode() {
+            const code = document.getElementById('authCode').value.trim();
+            if (code.length < 4) return;
 
-        if (!name || !user || pass.length < 6) return alert("Заполните поля корректно!");
-        const btn = document.getElementById('btnRegister');
-        btn.disabled = true;
+            const btn = document.getElementById('btnVerify');
+            btn.disabled = true;
 
-        try {
-            const response = await fetch('/api/register-final', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: currentEmail, fullname: name, username: user, password: pass })
-            });
-            if (response.ok) {
-                localStorage.setItem('username', user);
-                window.location.href = "/index.html";
-            } else {
-                const err = await response.json();
-                alert(err.error || "Ошибка регистрации");
+            try {
+                const response = await fetch('/api/verify-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: identifiedUsername, code: code }) 
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('username', result.user.username);
+                    window.location.href = "/index.html";
+                } else {
+                    alert(result.error || "Неверный код");
+                }
+            } catch (e) {
+                alert("Ошибка сервера");
+            } finally {
+                btn.disabled = false;
             }
-        } catch (e) {
-            alert("Ошибка соединения");
-        } finally {
-            btn.disabled = false;
         }
-    }
+
+        // 5. Восстановление пароля
+        function initPasswordReset() {
+            if (!canResetViaTelegram) {
+                alert("К этому аккаунту не привязан Telegram. Восстановление невозможно.");
+                return;
+            }
+            if (confirm("Отправить код для сброса пароля в ваш Telegram?")) {
+                requestAuthCode('telegram', true);
+            }
+        }
+
+        async function resetPassword() {
+            const code = document.getElementById('resetCode').value.trim();
+            const newPass = document.getElementById('resetPass').value;
+
+            if (code.length < 4) return alert("Введите код из Telegram");
+            if (newPass.length < 6) return alert("Новый пароль должен быть от 6 символов");
+
+            const btn = document.getElementById('btnReset');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        username: identifiedUsername, 
+                        code: code, 
+                        newPassword: newPass 
+                    })
+                });
+                
+                if (response.ok) {
+                    alert("Пароль успешно изменен!");
+                    localStorage.setItem('username', identifiedUsername);
+                    window.location.href = "/index.html";
+                } else {
+                    const res = await response.json();
+                    alert(res.error || "Ошибка при сбросе пароля");
+                }
+            } catch (e) {
+                alert("Ошибка сети");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // 6. Регистрация
+        async function finishRegistration() {
+            const name = document.getElementById('regFullName').value.trim();
+            const user = document.getElementById('regUsername').value.trim();
+            const tg = document.getElementById('regTelegram').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const pass = document.getElementById('regPass').value;
+
+            if (!name || !user || pass.length < 6) {
+                return alert("Поля Имя, Логин и Пароль (от 6 симв.) обязательны!");
+            }
+
+            const btn = document.getElementById('btnRegister');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/register-final', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        fullname: name, 
+                        username: user, 
+                        telegram: tg || null,
+                        email: email || null, 
+                        password: pass 
+                    })
+                });
+                
+                if (response.ok) {
+                    localStorage.setItem('username', user);
+                    window.location.href = "/index.html";
+                } else {
+                    const err = await response.json();
+                    alert(err.error || "Этот логин уже занят");
+                }
+            } catch (e) {
+                alert("Ошибка сети");
+            } finally {
+                btn.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>
