@@ -524,14 +524,15 @@
             path: '/peerjs'
         });
 
-        // Когда нам кто-то звонит
         peer.on('call', (incomingCall) => {
             currentCall = incomingCall;
+            
+            // ЧИТАЕМ METADATA: Узнаем, звонят нам с видео или без
+            isVideoCall = incomingCall.metadata ? incomingCall.metadata.isVideo : true;
             
             document.getElementById('call-overlay').classList.remove('hidden');
             document.getElementById('call-ui-content').classList.remove('hidden');
             
-            // ВОТ ИСПРАВЛЕНИЕ: Снимаем класс hidden с кнопок!
             document.getElementById('incoming-call-actions').classList.remove('hidden');
             document.getElementById('incoming-call-actions').style.display = 'flex';
             
@@ -539,7 +540,8 @@
             document.getElementById('video-container').classList.add('hidden');
             
             document.getElementById('call-name').textContent = incomingCall.peer;
-            document.getElementById('call-status-text').textContent = 'Входящий звонок...';
+            // Пишем правильный текст в зависимости от типа звонка
+            document.getElementById('call-status-text').textContent = isVideoCall ? 'Входящий видеозвонок...' : 'Входящий аудиозвонок...';
         });
     }
 
@@ -557,35 +559,31 @@
         document.getElementById('remote-video').srcObject = null;
     }
 
-    async function makeCall(video) {
-        if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) {
-            return showToast("Звонки доступны только один на один");
-        }
-        
+   async function makeCall(video) {
+        if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) return showToast("Звонки доступны только один на один");
         isVideoCall = video;
         
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ video: isVideoCall, audio: true });
             document.getElementById('local-video').srcObject = localStream;
             
-            currentCall = peer.call(selectedChatId, localStream);
+            // ДОБАВИЛИ METADATA: Передаем собеседнику инфу, видео это или аудио
+            currentCall = peer.call(selectedChatId, localStream, { metadata: { isVideo: isVideoCall } });
             showCallActiveUI(selectedChatId, "Звоним...");
             
             currentCall.on('stream', remoteStream => {
-                document.getElementById('call-status-text').textContent = 'Соединение установлено 00:00';
+                document.getElementById('call-status-text').textContent = 'Соединение установлено';
                 document.getElementById('remote-video').srcObject = remoteStream;
             });
             
             currentCall.on('close', closeCallUI);
-        } catch(err) { 
-            showToast("Нет доступа к микрофону/камере"); 
-        }
+        } catch(err) { showToast("Нет доступа к микрофону/камере"); }
     }
 
     async function acceptCall() {
         try {
-            // Просим аудио и видео при ответе
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            // Теперь включаем камеру ТОЛЬКО если это видеозвонок
+            localStream = await navigator.mediaDevices.getUserMedia({ video: isVideoCall, audio: true });
             document.getElementById('local-video').srcObject = localStream;
             
             currentCall.answer(localStream);
@@ -613,16 +611,22 @@
         closeCallUI();
     }
 
-    function showCallActiveUI(name, status) {
+   function showCallActiveUI(name, status) {
         document.getElementById('call-overlay').classList.remove('hidden');
         document.getElementById('incoming-call-actions').style.display = 'none';
         document.getElementById('active-call-actions').style.display = 'flex';
         document.getElementById('active-call-actions').classList.remove('hidden');
         document.getElementById('call-name').textContent = name;
         document.getElementById('call-status-text').textContent = status;
-        document.getElementById('video-container').classList.remove('hidden');
+        
+        // Показываем видео-окна только при видеозвонке. Иначе оставляем красивый фон с аватаркой!
+        if (isVideoCall) {
+            document.getElementById('video-container').classList.remove('hidden');
+        } else {
+            document.getElementById('video-container').classList.add('hidden');
+        }
     }
-
+    
     function closeCallUI() {
         document.getElementById('call-overlay').classList.add('hidden');
         if (localStream) localStream.getTracks().forEach(track => track.stop());
