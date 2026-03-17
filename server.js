@@ -6,7 +6,6 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const path = require('path');
 const SibApiV3Sdk = require('@getbrevo/brevo');
-const TelegramBot = require('node-telegram-bot-api'); // Добавлено
 
 const app = express();
 const server = http.createServer(app);
@@ -14,13 +13,10 @@ const io = new Server(server, {
     maxHttpBufferSize: 5e7 
 });
 
-// --- Настройка Telegram Бота ---
-const TG_TOKEN = process.env.TG_BOT_TOKEN || '8795912699:AAGNG756DWk2wDZA8fmsRlJSzGjxHvzlK0g';
-const bot = new TelegramBot(TG_TOKEN, { polling: true });
-
 // --- Настройка Brevo API ---
 let apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 let apiKey = apiInstance.authentications['apiKey'];
+// Берем ключ из настроек сервера (Environment Variables)
 apiKey.apiKey = process.env.BREVO_API_KEY;
 
 // --- HTML Шаблон для красивого письма ---
@@ -81,79 +77,54 @@ app.use(session({
     }
 }));
 
-// --- Логика Telegram ---
-bot.onText(/\/start/, (msg) => {
-    bot.sendMessage(msg.chat.id, `Твой ID: ${msg.chat.id}\nВведи его в профиле Aura, чтобы получать коды входа здесь.`);
-});
-
 // --- МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ ---
 
-// 1. Проверка пользователя (Поиск по username или email)
-app.post('/api/check-user', (req, res) => {
-    const { loginId } = req.body;
-    const users = readData(USERS_FILE);
-    const username = Object.keys(users).find(u => 
-        u.toLowerCase() === loginId.toLowerCase() || 
-        (users[u].email && users[u].email.toLowerCase() === loginId.toLowerCase())
-    );
-
-    if (username) {
-        const user = users[username];
-        res.json({
-            exists: true,
-            username: username,
-            hasEmail: !!user.email,
-            hasTelegram: !!user.telegramChatId
-        });
-    } else {
-        res.json({ exists: false });
-    }
-});
-
-// 2. Отправка кода (Telegram или Email)
-app.post('/api/send-auth-code', async (req, res) => {
-    const { username, method } = req.body;
-    const users = readData(USERS_FILE);
-    const user = users[username];
-
-    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-
+app.post('/api/send-code', async (req, res) => {
+    const { email } = req.body;
     const code = Math.floor(1000 + Math.random() * 9000).toString();
-    verificationCodes[username] = { code, timestamp: Date.now() };
+    
+    verificationCodes[email] = { code: code, timestamp: Date.now() };
 
-    console.log(`\n[AUTH] Код для ${username} (${method}): ${code}\n`);
+    // Печатаем в логи для дебага
+    console.log(`\n===============================\nКОД ДЛЯ ${email} : [ ${code} ]\n===============================\n`);
+
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = "Код подтверждения Aura Messenger";
+    sendSmtpEmail.htmlContent = getEmailTemplate(code);
+    sendSmtpEmail.textContent = `Здравствуйте! Ваш код подтверждения: ${code}`;
+    sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
+    sendSmtpEmail.to = [{ "email": email }];
 
     try {
-        if (method === 'telegram' && user.telegramChatId) {
-            await bot.sendMessage(user.telegramChatId, `🔐 Ваш код подтверждения Aura: ${code}`);
-            res.json({ success: true });
-        } else if (method === 'email' && user.email) {
-            await sendBrevoEmail(user.email, "Код подтверждения Aura", `Ваш код: ${code}`, getEmailTemplate(code));
-            res.json({ success: true });
-        } else {
-            res.status(400).json({ error: 'Метод недоступен' });
-        }
-    } catch (err) {
-        res.status(500).json({ error: 'Ошибка отправки' });
+        await apiInstance.sendTransacEmail(sendSmtpEmail);
+        res.status(200).json({ message: 'Код отправлен' });
+    } catch (error) {
+        console.log("Ошибка Brevo (письмо не ушло, код выше в логах ↑):", error.message || error);
+        res.status(200).json({ message: 'Режим отладки: проверьте логи' });
     }
 });
 
-// 3. Проверка кода
+// 2. Проверка кода
 app.post('/api/verify-code', (req, res) => {
-    const { username, code } = req.body;
-    const pending = verificationCodes[username];
+    const { email, code } = req.body;
+    const pending = verificationCodes[email];
     
-    if (!pending || pending.code !== code || (Date.now() - pending.timestamp > 300000)) {
+    if (!pending || pending.code !== code) {
         return res.status(400).json({ error: 'Неверный или просроченный код' });
     }
     
-    delete verificationCodes[username];
-    req.session.username = username;
     const users = readData(USERS_FILE);
-    res.json({ success: true, user: { username, ...users[username] } });
+    const username = Object.keys(users).find(k => users[k].email === email);
+
+    if (username) {
+        req.session.username = username;
+        res.json({ isNewUser: false, user: { username, ...users[username] } });
+    } else {
+        res.json({ isNewUser: true });
+    }
 });
 
-// 4. Финальная регистрация (Email теперь необязателен)
+// 3. Финальная регистрация
 app.post('/api/register-final', async (req, res) => {
     const { email, fullname, username, password } = req.body;
     const users = readData(USERS_FILE);
@@ -162,7 +133,7 @@ app.post('/api/register-final', async (req, res) => {
 
     users[username] = {
         password: await bcrypt.hash(password, 10),
-        email: email || null,
+        email: email,
         name: fullname,
         avatar: null,
         bio: '',
@@ -170,7 +141,6 @@ app.post('/api/register-final', async (req, res) => {
         profilePattern: 'none',
         contacts: [],
         blocked: [],
-        telegramChatId: null,
         lastSeen: Date.now()
     };
 
@@ -199,19 +169,16 @@ function writeData(file, data) {
     fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-// Вход по паролю (Обновлено под поиск по ID)
+// Вход по паролю
 app.post('/api/login-password', async (req, res) => {
-    const { loginId, password } = req.body;
+    const { email, password } = req.body;
     const users = readData(USERS_FILE);
     
-    const username = Object.keys(users).find(u => 
-        u.toLowerCase() === loginId.toLowerCase() || 
-        (users[u].email && users[u].email.toLowerCase() === loginId.toLowerCase())
-    );
+    const username = Object.keys(users).find(k => users[k].email === email);
     const user = users[username];
     
     if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(400).json({ error: 'Неверные данные' });
+        return res.status(400).json({ error: 'Неверный пароль' });
     }
     
     req.session.username = username;
@@ -230,7 +197,7 @@ app.get('/my-full-profile', (req, res) => {
     const user = users[req.session.username];
     if (!user) return res.status(404).json({ error: 'Not found' });
     
-    const { password, ...safeUser } = user;
+    const { password, email, ...safeUser } = user;
     res.json({ username: req.session.username, ...safeUser });
 });
 
@@ -246,7 +213,6 @@ app.post('/update-profile', (req, res) => {
     if (req.body.birthday !== undefined) user.birthday = req.body.birthday;
     if (req.body.avatar !== undefined) user.avatar = req.body.avatar;
     if (req.body.profilePattern !== undefined) user.profilePattern = req.body.profilePattern;
-    if (req.body.telegramChatId !== undefined) user.telegramChatId = req.body.telegramChatId;
     
     writeData(USERS_FILE, users);
     res.json({ success: true });
