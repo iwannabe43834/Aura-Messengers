@@ -20,6 +20,9 @@
     "socket.io": "^4.7.2",
 
     "fs": "0.0.1-security",
+    "mongoose": "^8.0.0",
+    
+    "peer": "^1.0.2",
 
     "bcryptjs": "^2.4.3",
 
