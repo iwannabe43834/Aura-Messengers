@@ -6,11 +6,37 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const path = require('path');
 const SibApiV3Sdk = require('@getbrevo/brevo');
+const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     maxHttpBufferSize: 5e7 
+});
+
+// --- Настройка Telegram Бота ---
+// Используем ваш токен
+const tgToken = '8795912699:AAGNG756DWk2wDZA8fmsRlJSzGjxHvzlK0g';
+const tgBot = new TelegramBot(tgToken, { polling: true });
+
+const TG_USERS_FILE = path.join(__dirname, 'tg_users.json');
+
+// Собираем chat_id, когда кто-то пишет боту
+tgBot.on('message', (msg) => {
+    const chatId = msg.chat.id;
+    const username = msg.from.username; 
+    
+    if (username) {
+        let tgUsers = readData(TG_USERS_FILE);
+        tgUsers[username.toLowerCase()] = chatId;
+        writeData(TG_USERS_FILE, tgUsers);
+        
+        if (msg.text === '/start') {
+            tgBot.sendMessage(chatId, "👋 Привет! Ваш Telegram успешно привязан к Aura Messenger. Сюда будут приходить коды доступа и восстановления.");
+        }
+    } else {
+        tgBot.sendMessage(chatId, "⚠️ У вас не установлен @username в Telegram! Пожалуйста, установите его в настройках вашего профиля Telegram, чтобы Aura Messenger мог отправлять вам коды.");
+    }
 });
 
 // --- Настройка Brevo API ---
@@ -77,63 +103,167 @@ app.use(session({
     }
 }));
 
+const USERS_FILE = path.join(__dirname, 'users.json');
+const MESSAGES_FILE = path.join(__dirname, 'messages.json');
+const GROUPS_FILE = path.join(__dirname, 'groups.json');
+
+// --- Инициализация файлов БД ---
+function initFiles() {
+    if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, JSON.stringify({}));
+    if (!fs.existsSync(MESSAGES_FILE)) fs.writeFileSync(MESSAGES_FILE, JSON.stringify([]));
+    if (!fs.existsSync(GROUPS_FILE)) fs.writeFileSync(GROUPS_FILE, JSON.stringify({}));
+    if (!fs.existsSync(TG_USERS_FILE)) fs.writeFileSync(TG_USERS_FILE, JSON.stringify({}));
+}
+initFiles();
+
+function readData(file) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } 
+    catch (e) { return file === MESSAGES_FILE ? [] : {}; }
+}
+function writeData(file, data) {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
 // --- МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ ---
 
-app.post('/api/send-code', async (req, res) => {
-    const { email } = req.body;
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
+// 1. Поиск пользователя (по username или email)
+app.post('/api/check-user', (req, res) => {
+    const { loginId } = req.body;
+    const users = readData(USERS_FILE);
     
-    verificationCodes[email] = { code: code, timestamp: Date.now() };
+    let targetUsername = null;
+    let targetUser = null;
 
-    // Печатаем в логи для дебага
-    console.log(`\n===============================\nКОД ДЛЯ ${email} : [ ${code} ]\n===============================\n`);
+    for (const uname in users) {
+        if (uname.toLowerCase() === loginId.toLowerCase() || 
+           (users[uname].email && users[uname].email.toLowerCase() === loginId.toLowerCase())) {
+            targetUsername = uname;
+            targetUser = users[uname];
+            break;
+        }
+    }
 
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = "Код подтверждения Aura Messenger";
-    sendSmtpEmail.htmlContent = getEmailTemplate(code);
-    sendSmtpEmail.textContent = `Здравствуйте! Ваш код подтверждения: ${code}`;
-    sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
-    sendSmtpEmail.to = [{ "email": email }];
-
-    try {
-        await apiInstance.sendTransacEmail(sendSmtpEmail);
-        res.status(200).json({ message: 'Код отправлен' });
-    } catch (error) {
-        console.log("Ошибка Brevo (письмо не ушло, код выше в логах ↑):", error.message || error);
-        res.status(200).json({ message: 'Режим отладки: проверьте логи' });
+    if (targetUser) {
+        res.json({
+            exists: true,
+            username: targetUsername,
+            hasEmail: !!targetUser.email,
+            hasTelegram: !!targetUser.telegram
+        });
+    } else {
+        res.json({ exists: false });
     }
 });
 
-// 2. Проверка кода
+// 2. Отправка кода (Telegram / Email)
+app.post('/api/send-auth-code', async (req, res) => {
+    const { username, method, isReset } = req.body;
+    const users = readData(USERS_FILE);
+    const user = users[username];
+    
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    verificationCodes[username] = { code, timestamp: Date.now() };
+    
+    console.log(`\n===============================\nКОД ДЛЯ ${username} [${method}]: [ ${code} ]\n===============================\n`);
+
+    if (method === 'telegram' && user.telegram) {
+        const tgUsers = readData(TG_USERS_FILE);
+        const chatId = tgUsers[user.telegram.toLowerCase()];
+        
+        if (chatId) {
+            const text = isReset ? 
+                `🔐 Код для сброса пароля Aura: *${code}*` : 
+                `🔑 Ваш код для входа в Aura: *${code}*`;
+            
+            try {
+                await tgBot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+                return res.json({ success: true, message: 'Код отправлен в Telegram' });
+            } catch (err) {
+                return res.status(500).json({ error: 'Ошибка отправки в Telegram' });
+            }
+        } else {
+            return res.status(400).json({ error: 'Сервер не знает ваш Telegram. Пожалуйста, напишите /start боту!' });
+        }
+    } else if (method === 'email' && user.email) {
+        const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+        sendSmtpEmail.subject = isReset ? "Сброс пароля Aura Messenger" : "Код подтверждения Aura Messenger";
+        sendSmtpEmail.htmlContent = getEmailTemplate(code);
+        sendSmtpEmail.textContent = `Здравствуйте! Ваш код: ${code}`;
+        sendSmtpEmail.sender = { "name": "Aura Messenger", "email": "auramessengercode@gmail.com" };
+        sendSmtpEmail.to = [{ "email": user.email }];
+
+        try {
+            await apiInstance.sendTransacEmail(sendSmtpEmail);
+            res.status(200).json({ success: true, message: 'Код отправлен на E-mail' });
+        } catch (error) {
+            console.log("Ошибка Brevo (письмо не ушло, код выше в логах ↑):", error.message || error);
+            res.status(200).json({ success: true, message: 'Режим отладки: проверьте логи сервера' });
+        }
+    } else {
+        res.status(400).json({ error: 'Неверный метод или контакт не привязан' });
+    }
+});
+
+// 3. Проверка кода (универсальная)
 app.post('/api/verify-code', (req, res) => {
-    const { email, code } = req.body;
-    const pending = verificationCodes[email];
+    const { username, code } = req.body;
+    const pending = verificationCodes[username];
     
     if (!pending || pending.code !== code) {
         return res.status(400).json({ error: 'Неверный или просроченный код' });
     }
     
+    delete verificationCodes[username];
     const users = readData(USERS_FILE);
-    const username = Object.keys(users).find(k => users[k].email === email);
+    const user = users[username];
 
-    if (username) {
+    if (user) {
         req.session.username = username;
-        res.json({ isNewUser: false, user: { username, ...users[username] } });
+        res.json({ isNewUser: false, user: { username, ...user } });
     } else {
         res.json({ isNewUser: true });
     }
 });
 
-// 3. Финальная регистрация
+// 4. Вход по паролю
+app.post('/api/login-password', async (req, res) => {
+    const { loginId, password } = req.body;
+    const users = readData(USERS_FILE);
+    
+    let username = null;
+    let user = null;
+    for (const uname in users) {
+        if (uname.toLowerCase() === loginId.toLowerCase() || 
+           (users[uname].email && users[uname].email.toLowerCase() === loginId.toLowerCase())) {
+            username = uname; 
+            user = users[uname];
+            break;
+        }
+    }
+    
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+        return res.status(400).json({ error: 'Неверный логин или пароль' });
+    }
+    
+    req.session.username = username;
+    res.json({ success: true, user: { username, name: user.name, avatar: user.avatar } });
+});
+
+// 5. Финальная регистрация
 app.post('/api/register-final', async (req, res) => {
-    const { email, fullname, username, password } = req.body;
+    const { fullname, username, email, telegram, password } = req.body;
     const users = readData(USERS_FILE);
 
     if (users[username]) return res.status(400).json({ error: 'Этот логин уже занят' });
 
+    let cleanTg = telegram ? telegram.replace('@', '').toLowerCase() : null;
+
     users[username] = {
         password: await bcrypt.hash(password, 10),
-        email: email,
+        email: email || null,
+        telegram: cleanTg,
         name: fullname,
         avatar: null,
         bio: '',
@@ -149,40 +279,22 @@ app.post('/api/register-final', async (req, res) => {
     res.json({ success: true, user: { username, name: fullname } });
 });
 
-const USERS_FILE = path.join(__dirname, 'users.json');
-const MESSAGES_FILE = path.join(__dirname, 'messages.json');
-const GROUPS_FILE = path.join(__dirname, 'groups.json');
-
-// --- Инициализация файлов БД ---
-function initFiles() {
-    if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, JSON.stringify({}));
-    if (!fs.existsSync(MESSAGES_FILE)) fs.writeFileSync(MESSAGES_FILE, JSON.stringify([]));
-    if (!fs.existsSync(GROUPS_FILE)) fs.writeFileSync(GROUPS_FILE, JSON.stringify({}));
-}
-initFiles();
-
-function readData(file) {
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } 
-    catch (e) { return file === MESSAGES_FILE ? [] : {}; }
-}
-function writeData(file, data) {
-    fs.writeFileSync(file, JSON.stringify(data, null, 2));
-}
-
-// Вход по паролю
-app.post('/api/login-password', async (req, res) => {
-    const { email, password } = req.body;
-    const users = readData(USERS_FILE);
+// 6. Сброс пароля
+app.post('/api/reset-password', async (req, res) => {
+    const { username, code, newPassword } = req.body;
+    const pending = verificationCodes[username];
     
-    const username = Object.keys(users).find(k => users[k].email === email);
-    const user = users[username];
-    
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(400).json({ error: 'Неверный пароль' });
+    if (!pending || pending.code !== code) {
+        return res.status(400).json({ error: 'Неверный код' });
     }
+
+    const users = readData(USERS_FILE);
+    users[username].password = await bcrypt.hash(newPassword, 10);
+    writeData(USERS_FILE, users);
     
+    delete verificationCodes[username];
     req.session.username = username;
-    res.json({ success: true, user: { username, name: user.name, avatar: user.avatar } });
+    res.json({ success: true });
 });
 
 app.get('/logout', (req, res) => {
@@ -197,7 +309,7 @@ app.get('/my-full-profile', (req, res) => {
     const user = users[req.session.username];
     if (!user) return res.status(404).json({ error: 'Not found' });
     
-    const { password, email, ...safeUser } = user;
+    const { password, ...safeUser } = user;
     res.json({ username: req.session.username, ...safeUser });
 });
 
@@ -648,5 +760,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
+    console.log(`Сервер запущен на порту ${PORT}. Telegram бот активен.`);
 });
