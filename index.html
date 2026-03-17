@@ -517,7 +517,7 @@
     let localStream = null;
     let isVideoCall = false;
 
-    function initPeerJS() {
+   function initPeerJS() {
         peer = new Peer(currentUser.username, {
             host: window.location.hostname,
             port: window.location.port || (window.location.protocol === 'https:' ? 443 : 80),
@@ -530,13 +530,31 @@
             
             document.getElementById('call-overlay').classList.remove('hidden');
             document.getElementById('call-ui-content').classList.remove('hidden');
+            
+            // ВОТ ИСПРАВЛЕНИЕ: Снимаем класс hidden с кнопок!
+            document.getElementById('incoming-call-actions').classList.remove('hidden');
             document.getElementById('incoming-call-actions').style.display = 'flex';
+            
             document.getElementById('active-call-actions').classList.add('hidden');
             document.getElementById('video-container').classList.add('hidden');
             
             document.getElementById('call-name').textContent = incomingCall.peer;
             document.getElementById('call-status-text').textContent = 'Входящий звонок...';
         });
+    }
+
+    function closeCallUI() {
+        document.getElementById('call-overlay').classList.add('hidden');
+        
+        // ВОТ ИСПРАВЛЕНИЕ: Прячем кнопки обратно при завершении
+        document.getElementById('incoming-call-actions').classList.add('hidden');
+        document.getElementById('active-call-actions').classList.add('hidden');
+        
+        if (localStream) localStream.getTracks().forEach(track => track.stop());
+        currentCall = null; 
+        localStream = null;
+        document.getElementById('local-video').srcObject = null;
+        document.getElementById('remote-video').srcObject = null;
     }
 
     async function makeCall(video) {
