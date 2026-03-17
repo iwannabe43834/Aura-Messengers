@@ -1,14 +1,12 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    
     <script>
-  // Этот код проверяет, залогинен ли ты в самом приложении
-  if (!localStorage.getItem('username')) {
-      window.location.href = 'auth.html'; 
-  }
-</script>
-
+        // Проверка, залогинен ли юзер
+        if (!localStorage.getItem('username')) {
+            window.location.href = 'auth.html'; 
+        }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Aura Messenger</title>
@@ -19,7 +17,11 @@
     
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script src="/socket.io/socket.io.js"></script>
+    
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
     <style>
         .status.typing { color: var(--primary); font-style: italic; }
         .avatar-wrapper { position: relative; display: inline-block; }
@@ -32,7 +34,6 @@
         .reaction-badge.reacted { border-color: var(--primary); background: var(--primary-soft); }
         .reaction-badge:hover { transform: scale(1.05); filter: brightness(1.2); }
         
-        /* Стили модалок */
         .modal-form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; text-align: left; padding: 0 20px;}
         .modal-form-group label { font-size: 0.8rem; color: var(--primary); font-weight: bold; text-transform: uppercase; }
         .modal-form-group input, .modal-form-group textarea { width: 100%; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; color: var(--text-main); outline: none; }
@@ -46,7 +47,6 @@
         .group-avatar-upload { width: 80px; height: 80px; border-radius: 50%; background: var(--bg-secondary); border: 2px dashed var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; cursor: pointer; font-size: 1.5rem; color: var(--text-dim); background-size: cover; background-position: center; }
         .msg-sender-name { font-size: 0.8rem; font-weight: bold; color: var(--primary); margin-bottom: 3px; cursor: pointer; }
 
-        /* Новые стили для каналов и админки */
         .type-selector { display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; }
         .type-selector label { padding: 10px 20px; background: var(--bg-secondary); border-radius: 20px; cursor: pointer; font-size: 0.9rem; border: 1px solid var(--border); transition: 0.2s; }
         .type-selector input { display: none; }
@@ -62,6 +62,30 @@
 
 <audio id="snd-send" src="send.mp3" preload="auto"></audio>
 <audio id="snd-notify" src="notify.mp3" preload="auto"></audio>
+
+<div id="call-overlay" class="modal hidden" style="z-index: 3000; background: var(--bg-main);">
+    <div id="call-ui-content" class="modal-content tg-style-profile" style="text-align:center; padding: 40px 20px; border: none; box-shadow: none; background: transparent;">
+        <div class="avatar-huge" id="call-avatar" style="margin: 0 auto 20px; width: 120px; height: 120px; font-size: 3rem;"></div>
+        <h2 id="call-name" style="font-size: 1.8rem; margin-bottom: 10px;">Name</h2>
+        <p id="call-status-text" style="color: var(--primary); font-size: 1.1rem; margin-bottom: 40px;">Звонит...</p>
+        
+        <div id="incoming-call-actions" class="hidden" style="display:flex; justify-content:center; gap:30px;">
+            <button onclick="acceptCall()" style="background:#4ade80; color:#fff; border:none; border-radius:50%; width:70px; height:70px; font-size:1.8rem; cursor:pointer; box-shadow: 0 10px 20px rgba(74,222,128,0.3); transition: 0.2s;"><i class="fas fa-phone"></i></button>
+            <button onclick="rejectCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:70px; height:70px; font-size:1.8rem; cursor:pointer; box-shadow: 0 10px 20px rgba(255,59,48,0.3); transition: 0.2s;"><i class="fas fa-phone-slash"></i></button>
+        </div>
+
+        <div id="active-call-actions" class="hidden" style="display:flex; justify-content:center; gap:20px; position: absolute; bottom: 40px; left: 0; width: 100%; z-index: 10;">
+            <button onclick="toggleVideo()" id="video-toggle-btn" style="background:var(--bg-secondary); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.5rem; cursor:pointer; transition: 0.2s;"><i class="fas fa-video"></i></button>
+            <button onclick="toggleAudio()" id="audio-toggle-btn" style="background:var(--bg-secondary); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.5rem; cursor:pointer; transition: 0.2s;"><i class="fas fa-microphone"></i></button>
+            <button onclick="endCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.5rem; cursor:pointer; box-shadow: 0 10px 20px rgba(255,59,48,0.3); transition: 0.2s;"><i class="fas fa-phone-slash"></i></button>
+        </div>
+    </div>
+    
+    <div id="video-container" class="hidden" style="position:absolute; top:0; left:0; width:100%; height:100%; background:#000; z-index: 1;">
+         <video id="remote-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+         <video id="local-video" autoplay playsinline muted style="width:120px; height:160px; position:absolute; bottom:120px; right:20px; border-radius:12px; object-fit:cover; border:2px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 5;"></video>
+    </div>
+</div>
 
 <div class="app-container" id="main-container">
     <div id="liquid-bg" class="liquid-bg hidden">
@@ -83,6 +107,8 @@
         </div>
         <div class="context-actions">
             <button onclick="contextReply()"><i class="fas fa-reply"></i> <span data-i18n="reply">Ответить</span></button>
+            <button id="ctx-edit-btn" onclick="contextEdit()"><i class="fas fa-pencil-alt"></i> <span>Изменить</span></button>
+            <button id="ctx-pin-btn" onclick="contextPin()"><i class="fas fa-thumbtack"></i> <span>Закрепить</span></button>
             <button class="danger" onclick="contextDelete()"><i class="fas fa-trash"></i> <span data-i18n="delete">Удалить</span></button>
         </div>
     </div>
@@ -224,7 +250,7 @@
                             </div>
                         </div>
                         <div id="p-members-list" class="group-members-manage-list" style="width: 100%; display: none;">
-                            </div>
+                        </div>
                     </div>
                     
                     <div class="detail-separator"></div>
@@ -375,16 +401,45 @@
         </div>
 
         <div id="chat-ui" class="chat-ui hidden">
-            <header class="chat-header">
-                <button class="mobile-back-btn" onclick="closeChatMobile()">
-                    <i class="fas fa-arrow-left"></i>
-                </button>
-                <div class="chat-header-avatar" id="chat-header-avatar"></div>
-                <div class="chat-info" id="chat-header-info" style="cursor: pointer;">
-                    <strong id="chat-with-title">Загрузка...</strong>
-                    <span class="status" id="chat-status"></span>
+            <header class="chat-header" style="justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="mobile-back-btn" onclick="closeChatMobile()">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div class="chat-header-avatar" id="chat-header-avatar"></div>
+                    <div class="chat-info" id="chat-header-info" style="cursor: pointer;">
+                        <strong id="chat-with-title">Загрузка...</strong>
+                        <span class="status" id="chat-status"></span>
+                    </div>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button id="header-phone-btn" style="background:none; border:none; color:var(--primary); font-size:1.2rem; cursor:pointer;" onclick="makeCall(false)">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                    <button id="header-video-btn" style="background:none; border:none; color:var(--primary); font-size:1.2rem; cursor:pointer; margin-right: 5px;" onclick="makeCall(true)">
+                        <i class="fas fa-video"></i>
+                    </button>
+                    
+                    <button style="background:none; border:none; color:var(--text-dim); font-size:1.2rem; cursor:pointer;" onclick="toggleChatSearch()">
+                        <i class="fas fa-search"></i>
+                    </button>
                 </div>
             </header>
+
+            <div id="chat-search-bar" class="hidden" style="padding: 10px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; gap: 10px;">
+                <input type="text" id="chat-search-input" placeholder="Поиск сообщений..." style="flex:1; padding:8px 15px; border-radius:15px; border:1px solid var(--border); background:var(--bg-main); color:white; outline:none;">
+                <button style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:1.2rem;" onclick="performChatSearch()"><i class="fas fa-check"></i></button>
+                <button style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1.2rem;" onclick="toggleChatSearch()"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div id="pinned-banner" class="hidden" style="background: var(--bg-secondary); padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; cursor: pointer; z-index: 11; transition: 0.3s;">
+                <i class="fas fa-thumbtack" style="color: var(--primary);"></i>
+                <div style="flex: 1; overflow: hidden;">
+                    <div style="color: var(--primary); font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">Закрепленное сообщение</div>
+                    <div id="pinned-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 0.9rem; color: var(--text-main);"></div>
+                </div>
+            </div>
 
             <div id="messages" class="messages-container"></div>
 
@@ -430,10 +485,16 @@
     let isCurrentChatGroup = false;
     let replyData = null;
     let viewingUserProfile = null;
-    let viewingEntityData = null; // Для хранения полных данных текущего просматриваемого профиля
+    let viewingEntityData = null; 
     let unreadCounts = {}; 
     let currentGroupAvatarBase64 = null;
-    let editModeGroupId = null; // Для модалки редактирования
+    let editModeGroupId = null; 
+
+    // Переменные для пагинации и редактирования
+    let currentOffset = 0;
+    let isLoadingHistory = false;
+    let hasMoreHistory = true;
+    let editData = null; 
 
     const messagesDiv = document.getElementById('messages');
     const searchInput = document.getElementById('searchUser');
@@ -450,6 +511,134 @@
     const chatStatusEl = document.getElementById('chat-status');
     const contextMenuEl = document.getElementById('msg-context-menu');
 
+    // --- ЛОГИКА WEBRTC И PEERJS ДЛЯ ЗВОНКОВ ---
+    let peer = null;
+    let currentCall = null;
+    let localStream = null;
+    let isVideoCall = false;
+
+    function initPeerJS() {
+        peer = new Peer(currentUser.username, {
+            host: window.location.hostname,
+            port: window.location.port || (window.location.protocol === 'https:' ? 443 : 80),
+            path: '/peerjs'
+        });
+
+        // Когда нам кто-то звонит
+        peer.on('call', (incomingCall) => {
+            currentCall = incomingCall;
+            
+            document.getElementById('call-overlay').classList.remove('hidden');
+            document.getElementById('call-ui-content').classList.remove('hidden');
+            document.getElementById('incoming-call-actions').style.display = 'flex';
+            document.getElementById('active-call-actions').classList.add('hidden');
+            document.getElementById('video-container').classList.add('hidden');
+            
+            document.getElementById('call-name').textContent = incomingCall.peer;
+            document.getElementById('call-status-text').textContent = 'Входящий звонок...';
+        });
+    }
+
+    async function makeCall(video) {
+        if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) {
+            return showToast("Звонки доступны только один на один");
+        }
+        
+        isVideoCall = video;
+        
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: isVideoCall, audio: true });
+            document.getElementById('local-video').srcObject = localStream;
+            
+            currentCall = peer.call(selectedChatId, localStream);
+            showCallActiveUI(selectedChatId, "Звоним...");
+            
+            currentCall.on('stream', remoteStream => {
+                document.getElementById('call-status-text').textContent = 'Соединение установлено 00:00';
+                document.getElementById('remote-video').srcObject = remoteStream;
+            });
+            
+            currentCall.on('close', closeCallUI);
+        } catch(err) { 
+            showToast("Нет доступа к микрофону/камере"); 
+        }
+    }
+
+    async function acceptCall() {
+        try {
+            // Просим аудио и видео при ответе
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById('local-video').srcObject = localStream;
+            
+            currentCall.answer(localStream);
+            showCallActiveUI(currentCall.peer, "Соединение установлено");
+            
+            currentCall.on('stream', remoteStream => {
+                document.getElementById('remote-video').srcObject = remoteStream;
+            });
+            
+            currentCall.on('close', closeCallUI);
+        } catch(err) { 
+            showToast("Нет доступа к микрофону/камере"); 
+            rejectCall(); 
+        }
+    }
+
+    function rejectCall() {
+        if (currentCall) currentCall.close();
+        closeCallUI();
+    }
+
+    function endCall() {
+        if (currentCall) currentCall.close();
+        if (localStream) localStream.getTracks().forEach(track => track.stop());
+        closeCallUI();
+    }
+
+    function showCallActiveUI(name, status) {
+        document.getElementById('call-overlay').classList.remove('hidden');
+        document.getElementById('incoming-call-actions').style.display = 'none';
+        document.getElementById('active-call-actions').style.display = 'flex';
+        document.getElementById('active-call-actions').classList.remove('hidden');
+        document.getElementById('call-name').textContent = name;
+        document.getElementById('call-status-text').textContent = status;
+        document.getElementById('video-container').classList.remove('hidden');
+    }
+
+    function closeCallUI() {
+        document.getElementById('call-overlay').classList.add('hidden');
+        if (localStream) localStream.getTracks().forEach(track => track.stop());
+        currentCall = null; 
+        localStream = null;
+        document.getElementById('local-video').srcObject = null;
+        document.getElementById('remote-video').srcObject = null;
+    }
+
+    function toggleAudio() {
+        if (localStream) {
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                const btn = document.getElementById('audio-toggle-btn');
+                btn.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
+                btn.style.background = audioTrack.enabled ? 'var(--bg-secondary)' : '#ff3b30';
+            }
+        }
+    }
+
+    function toggleVideo() {
+        if (localStream) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                const btn = document.getElementById('video-toggle-btn');
+                btn.innerHTML = videoTrack.enabled ? '<i class="fas fa-video"></i>' : '<i class="fas fa-video-slash"></i>';
+                btn.style.background = videoTrack.enabled ? 'var(--bg-secondary)' : '#ff3b30';
+            }
+        }
+    }
+
+
     let mediaRecorder; 
     let audioChunks = []; 
     let isRecording = false; 
@@ -460,11 +649,10 @@
     let typingTimer; 
     const TYPING_TIMEOUT = 2000;
 
-    // --- Локализация ---
     const dict = {
         ru: { 
             writeMsg: "Написать", addContact: "В контакты", removeContact: "Из контактов", blockUser: "Заблокировать", unblockUser: "Разблокировать", 
-            aboutMe: "О себе", birthday: "День рождения", locationLabel: "Город / Локация", websiteLabel: "Веб-сайт", username: "Имя пользователя / ID", settings: "Настройки", choosePhoto: "Выбрать фото", 
+            aboutMe: "О себе", birthday: "День рождения", locationLabel: "Город / Локация", websiteLabel: "Веб-сайт", username: "ID", settings: "Настройки", choosePhoto: "Выбрать фото", 
             general: "Профиль", appearance: "Внешний вид", yourNameLabel: "ВАШЕ ИМЯ", aboutMeLabel: "О СЕБЕ", birthdayLabel: "ДЕНЬ РОЖДЕНИЯ", 
             saveChanges: "Сохранить изменения", logout: "Выйти из аккаунта", languageLabel: "ЯЗЫК / LANGUAGE", themeLabel: "ЦВЕТОВАЯ ТЕМА", 
             chatPatternLabel: "УЗОР ФОНА ЧАТА", profilePatternLabel: "УЗОР ОБЛОЖКИ ПРОФИЛЯ", noPattern: "Без узора", patternDots: "Точки", 
@@ -482,26 +670,27 @@
         },
         en: { 
             writeMsg: "Message", addContact: "Add Contact", removeContact: "Remove Contact", blockUser: "Block", unblockUser: "Unblock", 
-            aboutMe: "Bio", birthday: "Birthday", locationLabel: "Location", websiteLabel: "Website", username: "Username / ID", settings: "Settings", choosePhoto: "Choose Photo", 
+            aboutMe: "Bio", birthday: "Birthday", locationLabel: "Location", websiteLabel: "Website", username: "ID", settings: "Settings", choosePhoto: "Choose Photo", 
             general: "Profile", appearance: "Appearance", yourNameLabel: "YOUR NAME", aboutMeLabel: "BIO", birthdayLabel: "BIRTHDAY", 
-            saveChanges: "Save Changes", logout: "Log Out", languageLabel: "LANGUAGE / ЯЗЫК", themeLabel: "COLOR THEME", 
-            chatPatternLabel: "CHAT BACKGROUND PATTERN", profilePatternLabel: "PROFILE COVER PATTERN", noPattern: "No pattern", 
-            patternDots: "Dots", patternGrid: "Grid", patternTelegram: "Telegram Pattern", searchPlaceholder: "Search @ID...", 
+            saveChanges: "Save Changes", logout: "Log Out", languageLabel: "LANGUAGE", themeLabel: "THEME", 
+            chatPatternLabel: "CHAT PATTERN", profilePatternLabel: "PROFILE PATTERN", noPattern: "None", 
+            patternDots: "Dots", patternGrid: "Grid", patternTelegram: "Telegram", searchPlaceholder: "Search @ID...", 
             savedMessages: "Saved Messages", savedSubtext: "Personal storage", selectChat: "Select a chat", 
-            secureMessages: "Your messages are secured by Aura", writeMessage: "Write a message...", swipeCancel: "Swipe to cancel", 
+            secureMessages: "Secured by Aura", writeMessage: "Write...", swipeCancel: "Swipe to cancel", 
             wasRecently: "last seen recently", wasToday: "last seen today at", wasAt: "last seen", online: "online", typing: "typing...", 
-            blockedStatus: "last seen a long time ago", notSpecified: "Not specified", notFound: "Chat not found", 
-            profileUpdated: "Profile updated!", photoUpdated: "Photo updated!", reply: "Reply", delete: "Delete", 
-            createGroup: "Create Community", typeGroup: "Group", typeChannel: "Channel", groupUsername: "ID (without @)", 
+            blockedStatus: "last seen a long time ago", notSpecified: "Not specified", notFound: "Not found", 
+            profileUpdated: "Updated!", photoUpdated: "Photo updated!", reply: "Reply", delete: "Delete", 
+            createGroup: "Create Community", typeGroup: "Group", typeChannel: "Channel", groupUsername: "ID", 
             groupName: "Name", groupDesc: "Description", addMembers: "Add members", createGroupBtn: "Create", saveBtn: "Save",
             customNameLabel: "Contact Name", saveContactBtn: "Save", addContactTitle: "Add Contact", 
-            addContactDesc: "Enter the name under which this user will be displayed for you.", membersCount: "Members", 
-            leaveGroup: "Leave", groupCreated: "Created!", readOnlyChannel: "Only administrators can post here", kickBtn: "Kick",
-            glassEffectLabel: "LIQUID GLASS EFFECT", on: "On", off: "Off"
+            addContactDesc: "Enter the name for this user.", membersCount: "Members", 
+            leaveGroup: "Leave", groupCreated: "Created!", readOnlyChannel: "Only admins can post", kickBtn: "Kick",
+            glassEffectLabel: "GLASS EFFECT", on: "On", off: "Off"
         }
     };
 
     let currentLang = 'ru';
+    
     function changeLanguage(lang) { 
         currentLang = lang; 
         document.documentElement.setAttribute('data-lang', lang); 
@@ -509,13 +698,19 @@
         document.getElementById('lang-select').value = lang; 
         applyTranslations(); 
     }
-    
-    function applyTranslations() {
-        document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if (dict[currentLang][key]) el.textContent = dict[currentLang][key]; });
-        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const key = el.getAttribute('data-i18n-placeholder'); if (dict[currentLang][key]) el.setAttribute('placeholder', dict[currentLang][key]); });
-        if (selectedChatId) updateChatStatus(selectedChatId, isCurrentChatGroup);
+
+    function applyTranslations() { 
+        document.querySelectorAll('[data-i18n]').forEach(el => { 
+            const key = el.getAttribute('data-i18n'); 
+            if (dict[currentLang][key]) el.textContent = dict[currentLang][key]; 
+        }); 
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { 
+            const key = el.getAttribute('data-i18n-placeholder'); 
+            if (dict[currentLang][key]) el.setAttribute('placeholder', dict[currentLang][key]); 
+        }); 
+        if (selectedChatId) updateChatStatus(selectedChatId, isCurrentChatGroup); 
     }
-    
+
     function showToast(message) { 
         const c = document.getElementById('toast-container'); 
         const t = document.createElement('div'); 
@@ -529,12 +724,14 @@
     }
 
     function formatLastSeen(timestamp) {
-        if (timestamp === 'blocked') return dict[currentLang].blockedStatus;
+        if (timestamp === 'blocked') return dict[currentLang].blockedStatus; 
         if (!timestamp) return dict[currentLang].wasRecently;
+        
         const date = new Date(timestamp); 
-        const now = new Date();
+        const now = new Date(); 
         const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+        
         return isToday ? `${dict[currentLang].wasToday} ${timeString}` : `${dict[currentLang].wasAt} ${date.toLocaleDateString()} ${timeString}`;
     }
 
@@ -544,17 +741,19 @@
             chatStatusEl.classList.remove('typing'); 
             return; 
         }
+        
         chatStatusEl.classList.remove('typing');
         
-        if (isGroup) {
-            chatStatusEl.textContent = `${membersCount} ${dict[currentLang].membersCount.toLowerCase()}`;
-            return;
+        if (isGroup) { 
+            chatStatusEl.textContent = `${membersCount} ${dict[currentLang].membersCount.toLowerCase()}`; 
+            return; 
         }
-
+        
         if (forceOnline !== null) { 
             chatStatusEl.textContent = forceOnline ? dict[currentLang].online : formatLastSeen(forceLastSeen); 
             return; 
         }
+        
         try { 
             const res = await fetch(`/api/entity/${chatId}`); 
             const data = await res.json(); 
@@ -564,81 +763,87 @@
         }
     }
 
-    async function requestNotificationPermission() {
-        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-            await Notification.requestPermission();
-        }
-    }
-
     async function init() {
         try {
             const res = await fetch('/my-full-profile'); 
             currentUser = await res.json();
+            
             if (!currentUser.username) return window.location.href = '/auth.html';
             
             socket.emit('identify', currentUser.username); 
             socket.emit('get_my_chats'); 
             
-            document.getElementById('edit-display-name').value = currentUser.name || '';
+            // Инициализация Звонков после успешного входа
+            initPeerJS();
+
+            document.getElementById('edit-display-name').value = currentUser.name || ''; 
             document.getElementById('edit-bio').value = currentUser.bio || ''; 
             document.getElementById('edit-location').value = currentUser.location || ''; 
             document.getElementById('edit-website').value = currentUser.website || ''; 
             document.getElementById('edit-birthday').value = currentUser.birthday || '';
             
             applySavedPreferences(); 
-            updateHeaderUI();
-            requestNotificationPermission();
+            updateHeaderUI(); 
+            
+            if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                await Notification.requestPermission();
+            }
         } catch (err) { 
             window.location.href = '/auth.html'; 
         }
     }
     init();
 
-    function closeChatMobile() { mainContainer.classList.remove('chat-open'); }
+    function closeChatMobile() { 
+        mainContainer.classList.remove('chat-open'); 
+    }
 
-    function updateUnreadBadge(chatId) {
-        const badge = document.getElementById(`unread-${chatId}`);
-        if(badge) {
-            const count = unreadCounts[chatId] || 0;
-            if(count > 0) {
-                badge.textContent = count;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
+    function updateUnreadBadge(chatId) { 
+        const badge = document.getElementById(`unread-${chatId}`); 
+        if(badge) { 
+            const count = unreadCounts[chatId] || 0; 
+            if(count > 0) { 
+                badge.textContent = count; 
+                badge.classList.remove('hidden'); 
+            } else { 
+                badge.classList.add('hidden'); 
+            } 
+        } 
     }
 
     async function openChat(chatId) {
-        selectedChatId = chatId;
-        unreadCounts[chatId] = 0;
-        updateUnreadBadge(chatId);
-
-        document.getElementById('welcome-screen').classList.add('hidden');
-        document.getElementById('chat-ui').classList.remove('hidden');
+        selectedChatId = chatId; 
+        unreadCounts[chatId] = 0; 
+        updateUnreadBadge(chatId); 
+        
+        currentOffset = 0; 
+        hasMoreHistory = true; 
+        document.getElementById('pinned-banner').classList.add('hidden'); 
+        messagesDiv.innerHTML = ''; 
+        document.getElementById('welcome-screen').classList.add('hidden'); 
+        document.getElementById('chat-ui').classList.remove('hidden'); 
         mainContainer.classList.add('chat-open');
         
         const headerAvatar = document.getElementById('chat-header-avatar');
         
         if (chatId === 'me') {
-            isCurrentChatGroup = false;
-            document.getElementById('chat-with-title').textContent = dict[currentLang].savedMessages;
+            isCurrentChatGroup = false; 
+            document.getElementById('chat-with-title').textContent = dict[currentLang].savedMessages; 
             document.getElementById('chat-header-info').onclick = null;
             headerAvatar.style.backgroundImage = 'none'; 
             headerAvatar.innerHTML = '<i class="fas fa-bookmark"></i>'; 
             headerAvatar.style.background = 'var(--primary)';
-            updateChatStatus('me', false);
-
+            updateChatStatus('me', false); 
             inputContainer.classList.remove('hidden'); 
             readonlyBanner.classList.add('hidden');
+            document.getElementById('header-phone-btn').style.display = 'none'; 
+            document.getElementById('header-video-btn').style.display = 'none';
         } else {
             const res = await fetch(`/api/entity/${chatId}`); 
             const data = await res.json(); 
-            
             isCurrentChatGroup = (data.type === 'group' || data.type === 'channel');
-            document.getElementById('chat-with-title').textContent = data.displayName || data.name || chatId;
+            document.getElementById('chat-with-title').textContent = data.displayName || data.name || chatId; 
             document.getElementById('chat-header-info').onclick = () => viewUserProfile(chatId);
-            
             headerAvatar.innerHTML = '';
             
             if (data.isBlocked) { 
@@ -654,140 +859,168 @@
                 headerAvatar.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); 
             }
 
-            // Логика блокировки ввода для каналов
-            if (data.type === 'channel' && !data.isCreator) {
+            if (data.type === 'channel' && !data.isCreator) { 
                 inputContainer.classList.add('hidden'); 
-                readonlyBanner.classList.remove('hidden');
-            } else {
+                readonlyBanner.classList.remove('hidden'); 
+            } else { 
                 inputContainer.classList.remove('hidden'); 
-                readonlyBanner.classList.add('hidden');
+                readonlyBanner.classList.add('hidden'); 
+            }
+            
+            if (isCurrentChatGroup) { 
+                document.getElementById('header-phone-btn').style.display = 'none'; 
+                document.getElementById('header-video-btn').style.display = 'none'; 
+            } else { 
+                document.getElementById('header-phone-btn').style.display = 'inline-block'; 
+                document.getElementById('header-video-btn').style.display = 'inline-block'; 
             }
 
             updateContactsUI(chatId); 
             updateChatStatus(chatId, isCurrentChatGroup, data.isOnline, data.lastSeen, data.membersCount);
         }
         socket.emit('mark_read', { chatWith: chatId }); 
-        socket.emit('get_history', chatId);
+        socket.emit('get_history', { chatWith: chatId, offset: 0 }); 
     }
 
-    // --- ЛОГИКА КОНТЕКСТНОГО МЕНЮ ---
-    let ctxTarget = null;
-    let longPressTimer;
+    // Слушатель для пагинации (Бесконечный скролл)
+    messagesDiv.addEventListener('scroll', () => { 
+        if (messagesDiv.scrollTop === 0 && !isLoadingHistory && hasMoreHistory) { 
+            isLoadingHistory = true; 
+            currentOffset += 40; 
+            socket.emit('get_history', { chatWith: selectedChatId, offset: currentOffset }); 
+        } 
+    });
 
+    let ctxTarget = null; 
+    let longPressTimer;
+    
     function openContextMenu(e, id, isMine, from, text) {
-        e.preventDefault();
+        e.preventDefault(); 
         ctxTarget = { id, isMine, from, text };
-        contextMenuEl.classList.remove('hidden');
+        
+        const editBtn = document.getElementById('ctx-edit-btn'); 
+        if (isMine) editBtn.style.display = 'flex'; else editBtn.style.display = 'none';
+        
+        const pinBtn = document.getElementById('ctx-pin-btn'); 
+        if (isCurrentChatGroup) pinBtn.style.display = 'flex'; else pinBtn.style.display = 'none';
+        
+        contextMenuEl.classList.remove('hidden'); 
         contextMenuEl.style.display = 'flex';
         
-        let x = e.pageX || (e.touches ? e.touches[0].pageX : 0);
+        let x = e.pageX || (e.touches ? e.touches[0].pageX : 0); 
         let y = e.pageY || (e.touches ? e.touches[0].pageY : 0);
+        const rect = contextMenuEl.getBoundingClientRect(); 
         
-        const rect = contextMenuEl.getBoundingClientRect();
-        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 10;
+        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 10; 
         if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 10;
         
-        contextMenuEl.style.left = `${x}px`; contextMenuEl.style.top = `${y}px`;
+        contextMenuEl.style.left = `${x}px`; 
+        contextMenuEl.style.top = `${y}px`; 
         setTimeout(() => contextMenuEl.classList.add('show'), 10);
     }
 
-    function closeContextMenu() {
-        contextMenuEl.classList.remove('show');
-        setTimeout(() => contextMenuEl.classList.add('hidden'), 200);
+    function closeContextMenu() { 
+        contextMenuEl.classList.remove('show'); 
+        setTimeout(() => contextMenuEl.classList.add('hidden'), 200); 
     }
-
-    document.addEventListener('click', (e) => { if (!e.target.closest('.custom-context-menu')) closeContextMenu(); });
+    
+    document.addEventListener('click', (e) => { 
+        if (!e.target.closest('.custom-context-menu')) closeContextMenu(); 
+    });
 
     function contextReact(emoji) { if(ctxTarget) socket.emit('add_reaction', { id: ctxTarget.id, emoji }); closeContextMenu(); }
     function contextReply() { if(ctxTarget) startReply(ctxTarget.from, ctxTarget.text || 'Медиа'); closeContextMenu(); }
-    function contextDelete() {
-        if(!ctxTarget) return;
-        if (ctxTarget.isMine && selectedChatId !== 'me') {
-            if (confirm("Удалить сообщение для ВСЕХ?\nOK - у всех, Отмена - только у меня")) socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: true });
-            else socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false });
-        } else {
-            if (confirm("Удалить это сообщение у себя?")) socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false });
-        }
-        closeContextMenu();
+    function contextEdit() { 
+        if (!ctxTarget || !ctxTarget.isMine) return; 
+        editData = { id: ctxTarget.id }; 
+        msgInput.value = ctxTarget.text || ''; 
+        msgInput.focus(); 
+        sendBtn.innerHTML = '<i class="fas fa-check"></i>'; 
+        sendBtn.classList.remove('hidden'); 
+        micBtn.classList.add('hidden'); 
+        closeContextMenu(); 
+    }
+    function contextPin() { if (!ctxTarget) return; socket.emit('pin_msg', { id: ctxTarget.id, text: ctxTarget.text, chatId: selectedChatId }); closeContextMenu(); }
+    function contextDelete() { 
+        if(!ctxTarget) return; 
+        if (ctxTarget.isMine && selectedChatId !== 'me') { 
+            if (confirm("Удалить для ВСЕХ?")) socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: true }); 
+            else socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false }); 
+        } else { 
+            if (confirm("Удалить у себя?")) socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false }); 
+        } 
+        closeContextMenu(); 
     }
 
-    function generateReactionsHtml(msgId, reactionsObj) {
+    function generateReactionsHtml(msgId, reactionsObj) { 
         if (!reactionsObj) return ''; 
-        let html = '';
-        for (const [emoji, users] of Object.entries(reactionsObj)) {
-            if (users.length > 0) {
-                const reacted = users.includes(currentUser.username);
-                html += `<div class="reaction-badge ${reacted ? 'reacted' : ''}" onclick="socket.emit('add_reaction', {id: '${msgId}', emoji: '${emoji}'})">${emoji} <small>${users.length}</small></div>`;
-            }
-        }
-        return html;
+        let html = ''; 
+        for (const [emoji, users] of Object.entries(reactionsObj)) { 
+            if (users.length > 0) { 
+                const reacted = users.includes(currentUser.username); 
+                html += `<div class="reaction-badge ${reacted ? 'reacted' : ''}" onclick="socket.emit('add_reaction', {id: '${msgId}', emoji: '${emoji}'})">${emoji} <small>${users.length}</small></div>`; 
+            } 
+        } 
+        return html; 
     }
 
-    async function renderMsg(msg) {
-        const isMine = msg.from === currentUser.username;
-        const isSaved = selectedChatId === 'me';
-        const div = document.createElement('div');
-        div.className = `message-row ${isMine ? 'mine' : 'other'}`;
+    function renderMsg(msg, isPrepend = false) {
+        const isMine = msg.from === currentUser.username; 
+        const isSaved = selectedChatId === 'me'; 
+        const div = document.createElement('div'); 
+        div.className = `message-row ${isMine ? 'mine' : 'other'}`; 
         div.setAttribute('data-id', msg.id);
         
-        let contentHtml = '';
-        if (msg.media) {
-            if (msg.media.type === 'image') contentHtml = `<img src="${msg.media.data}" class="media-content" onclick="window.open(this.src)">`;
-            else if (msg.media.type === 'video') contentHtml = `<video src="${msg.media.data}" controls class="media-video"></video>`;
-            else if (msg.media.type === 'audio' || msg.media.type === 'voice') contentHtml = `<audio src="${msg.media.data}" controls class="media-audio ${msg.media.type === 'voice' ? 'voice-message' : ''}"></audio>`;
+        let contentHtml = ''; 
+        if (msg.media) { 
+            if (msg.media.type === 'image') contentHtml = `<img src="${msg.media.data}" class="media-content" onclick="window.open(this.src)">`; 
+            else if (msg.media.type === 'video') contentHtml = `<video src="${msg.media.data}" controls class="media-video"></video>`; 
+            else if (msg.media.type === 'audio' || msg.media.type === 'voice') contentHtml = `<audio src="${msg.media.data}" controls class="media-audio ${msg.media.type === 'voice' ? 'voice-message' : ''}"></audio>`; 
         }
         
-        // В группах показываем имя отправителя для чужих сообщений
-        let senderNameHtml = '';
-        if (!isMine && !isSaved && isCurrentChatGroup) {
-            senderNameHtml = `<div class="msg-sender-name" onclick="viewUserProfile('${msg.from}')">${msg.fromDisplayName || msg.from}</div>`;
-        }
-
-        if (msg.text) contentHtml += `<div class="text">${msg.text}</div>`;
-
+        let senderNameHtml = ''; 
+        if (!isMine && !isSaved && isCurrentChatGroup) senderNameHtml = `<div class="msg-sender-name" onclick="viewUserProfile('${msg.from}')">${msg.fromDisplayName || msg.from}</div>`;
+        if (msg.text) contentHtml += `<div class="text">${msg.text} ${msg.isEdited ? '<small style="opacity:0.6; font-size:0.75rem;">(изм.)</small>' : ''}</div>`;
+        
         let replyMarkup = msg.reply ? `<div class="msg-reply-info"><small>↩ ${msg.reply.username}</small><div>${msg.reply.text}</div></div>` : '';
         const ticksHtml = isMine ? `<span class="status-ticks ${msg.read ? 'read' : ''}"><i class="fas fa-check"></i>${msg.read ? '<i class="fas fa-check" style="margin-left:-4px"></i>' : ''}</span>` : '';
-        const avId = 'msg-av-' + Math.random().toString(36).substr(2, 9);
+        const avId = 'msg-av-' + Math.random().toString(36).substr(2, 9); 
         const reactionsHtml = `<div class="msg-reactions" id="reactions-${msg.id}">${generateReactionsHtml(msg.id, msg.reactions)}</div>`;
-
-        div.innerHTML = `
-            ${(!isMine && !isSaved) ? `<div class="avatar msg-avatar" id="${avId}" onclick="viewUserProfile('${msg.from}')"></div>` : ''}
-            <div class="bubble">
-                ${senderNameHtml}
-                ${replyMarkup}
-                ${contentHtml}
-                <div class="msg-footer"><span class="time">${msg.time || ''}</span>${ticksHtml}</div>
-                ${reactionsHtml}
-            </div>
-        `;
-        messagesDiv.appendChild(div);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-        const bubbleEl = div.querySelector('.bubble');
-        bubbleEl.oncontextmenu = (e) => openContextMenu(e, msg.id, isMine, msg.from, msg.text);
-        bubbleEl.ontouchstart = (e) => { longPressTimer = setTimeout(() => { openContextMenu(e, msg.id, isMine, msg.from, msg.text); }, 500); };
-        bubbleEl.ontouchend = () => clearTimeout(longPressTimer);
+        
+        div.innerHTML = `${(!isMine && !isSaved) ? `<div class="avatar msg-avatar" id="${avId}" onclick="viewUserProfile('${msg.from}')"></div>` : ''}<div class="bubble">${senderNameHtml}${replyMarkup}${contentHtml}<div class="msg-footer"><span class="time">${msg.time || ''}</span>${ticksHtml}</div>${reactionsHtml}</div>`;
+        
+        if (isPrepend) messagesDiv.insertBefore(div, messagesDiv.firstChild); 
+        else messagesDiv.appendChild(div);
+        
+        const bubbleEl = div.querySelector('.bubble'); 
+        bubbleEl.oncontextmenu = (e) => openContextMenu(e, msg.id, isMine, msg.from, msg.text); 
+        bubbleEl.ontouchstart = (e) => { longPressTimer = setTimeout(() => { openContextMenu(e, msg.id, isMine, msg.from, msg.text); }, 500); }; 
+        bubbleEl.ontouchend = () => clearTimeout(longPressTimer); 
         bubbleEl.ontouchmove = () => clearTimeout(longPressTimer);
-
-        if (!isMine && !isSaved) {
-            const res = await fetch(`/api/entity/${msg.from}`); 
-            const data = await res.json(); 
-            const avEl = document.getElementById(avId);
-            if (avEl) {
-                if (data.isBlocked) { 
-                    avEl.style.backgroundImage = 'none'; avEl.style.background = 'var(--bg-hover)'; 
-                    avEl.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; 
+        
+        if (!isMine && !isSaved) { 
+            fetch(`/api/entity/${msg.from}`).then(res => res.json()).then(data => { 
+                const avEl = document.getElementById(avId); 
+                if (avEl) { 
+                    if (data.isBlocked) { avEl.style.backgroundImage = 'none'; avEl.style.background = 'var(--bg-hover)'; avEl.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } 
+                    else if (data.avatar) { avEl.style.backgroundImage = `url(${data.avatar})`; avEl.textContent = ''; } 
+                    else { avEl.textContent = (data.displayName || data.name || msg.from)[0].toUpperCase(); } 
                 } 
-                else if (data.avatar) { avEl.style.backgroundImage = `url(${data.avatar})`; avEl.textContent = ''; } 
-                else { avEl.textContent = (data.displayName || data.name || msg.from)[0].toUpperCase(); }
-            }
+            }).catch(()=>{}); 
         }
     }
 
     function send() {
         const text = msgInput.value.trim();
-        if ((text || replyData) && selectedChatId) {
-            socket.emit('private_msg', { to: selectedChatId, text: text, reply: replyData });
+        if (editData && text) { 
+            socket.emit('edit_msg', { id: editData.id, text: text }); 
+            editData = null; 
+            msgInput.value = ''; 
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>'; 
+            toggleInputButtons(); 
+        } 
+        else if ((text || replyData) && selectedChatId) { 
+            socket.emit('private_msg', { to: selectedChatId, text: text, reply: replyData }); 
             msgInput.value = ''; 
             toggleInputButtons(); 
             cancelReply(); 
@@ -795,554 +1028,271 @@
         }
     }
 
-    function toggleInputButtons() {
+    function toggleInputButtons() { 
         if (msgInput.value.trim().length > 0) { sendBtn.classList.remove('hidden'); micBtn.classList.add('hidden'); } 
-        else { sendBtn.classList.add('hidden'); micBtn.classList.remove('hidden'); }
+        else { sendBtn.classList.add('hidden'); micBtn.classList.remove('hidden'); } 
     }
-
-    msgInput.addEventListener('input', () => {
-        toggleInputButtons();
-        if (selectedChatId && selectedChatId !== 'me') {
+    
+    msgInput.addEventListener('input', () => { 
+        toggleInputButtons(); 
+        if (selectedChatId && selectedChatId !== 'me') { 
             socket.emit('typing', { to: selectedChatId }); 
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => { socket.emit('stop_typing', { to: selectedChatId }); }, TYPING_TIMEOUT);
-        }
+            clearTimeout(typingTimer); 
+            typingTimer = setTimeout(() => { socket.emit('stop_typing', { to: selectedChatId }); }, TYPING_TIMEOUT); 
+        } 
     });
 
-    // --- ЗАПИСЬ ГОЛОСА ---
+    function toggleChatSearch() { 
+        const bar = document.getElementById('chat-search-bar'); 
+        bar.classList.toggle('hidden'); 
+        if (!bar.classList.contains('hidden')) document.getElementById('chat-search-input').focus(); 
+        else { document.getElementById('chat-search-input').value = ''; openChat(selectedChatId); } 
+    }
+    
+    function performChatSearch() { 
+        const query = document.getElementById('chat-search-input').value.trim(); 
+        if (query) socket.emit('search_chat', { chatWith: selectedChatId, query: query }); 
+    }
+
     async function startRecording(e) {
         if (!selectedChatId || isRecording) return;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); 
-            mediaRecorder = new MediaRecorder(stream); audioChunks = []; isCancelled = false;
+            mediaRecorder = new MediaRecorder(stream); 
+            audioChunks = []; 
+            isCancelled = false;
             mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
-            mediaRecorder.onstop = () => {
-                stream.getTracks().forEach(track => track.stop()); clearInterval(recordingTimerId); resetRecordingUI();
-                if (!isCancelled && audioChunks.length > 0) { const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); sendVoiceMessage(audioBlob); }
+            mediaRecorder.onstop = () => { 
+                stream.getTracks().forEach(track => track.stop()); 
+                clearInterval(recordingTimerId); 
+                resetRecordingUI(); 
+                if (!isCancelled && audioChunks.length > 0) { 
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
+                    sendVoiceMessage(audioBlob); 
+                } 
                 isRecording = false; 
-                if(selectedChatId !== 'me') socket.emit('stop_typing', { to: selectedChatId });
+                if(selectedChatId !== 'me') socket.emit('stop_typing', { to: selectedChatId }); 
             };
-            mediaRecorder.start(); isRecording = true; 
-            if(selectedChatId !== 'me') socket.emit('typing', { to: selectedChatId });
+            mediaRecorder.start(); 
+            isRecording = true; 
+            if(selectedChatId !== 'me') socket.emit('typing', { to: selectedChatId }); 
             startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX; 
             showRecordingUI();
-        } catch (err) { showToast("Нет доступа к микрофону"); }
+        } catch (err) { 
+            showToast("Нет доступа к микрофону"); 
+        }
     }
-
+    
     function stopRecording() { if (mediaRecorder && isRecording) mediaRecorder.stop(); }
     function cancelRecording() { if (isRecording) { isCancelled = true; mediaRecorder.stop(); } }
     
-    function showRecordingUI() {
-        msgInput.classList.add('hidden'); attachBtn.classList.add('hidden'); recordUI.classList.remove('hidden'); micBtn.classList.add('recording-active');
-        recordingStartTime = Date.now(); recordTimeDisplay.textContent = "0:00";
+    function showRecordingUI() { 
+        msgInput.classList.add('hidden'); attachBtn.classList.add('hidden'); recordUI.classList.remove('hidden'); micBtn.classList.add('recording-active'); 
+        recordingStartTime = Date.now(); recordTimeDisplay.textContent = "0:00"; 
         recordingTimerId = setInterval(() => { 
             const diff = Math.floor((Date.now() - recordingStartTime) / 1000); 
             const mins = Math.floor(diff / 60); const secs = diff % 60; 
             recordTimeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; 
-        }, 1000);
+        }, 1000); 
     }
     
-    function resetRecordingUI() { msgInput.classList.remove('hidden'); attachBtn.classList.remove('hidden'); recordUI.classList.add('hidden'); micBtn.classList.remove('recording-active'); micBtn.style.transform = 'translateX(0px)'; }
+    function resetRecordingUI() { 
+        msgInput.classList.remove('hidden'); attachBtn.classList.remove('hidden'); recordUI.classList.add('hidden'); 
+        micBtn.classList.remove('recording-active'); micBtn.style.transform = 'translateX(0px)'; 
+    }
     
-    function sendVoiceMessage(blob) {
-        const reader = new FileReader();
-        reader.onloadend = () => { socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: 'voice', data: reader.result, name: 'Voice.webm' }, reply: replyData }); cancelReply(); };
-        reader.readAsDataURL(blob);
+    function sendVoiceMessage(blob) { 
+        const reader = new FileReader(); 
+        reader.onloadend = () => { 
+            socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: 'voice', data: reader.result, name: 'Voice.webm' }, reply: replyData }); 
+            cancelReply(); 
+        }; 
+        reader.readAsDataURL(blob); 
+    }
+    
+    micBtn.addEventListener('mousedown', startRecording); 
+    micBtn.addEventListener('touchstart', startRecording, {passive: true}); 
+    window.addEventListener('mouseup', () => { if (isRecording) stopRecording(); }); 
+    window.addEventListener('touchend', () => { if (isRecording) stopRecording(); }); 
+    window.addEventListener('mousemove', (e) => { if (isRecording) handleSwipe(e.clientX); }); 
+    window.addEventListener('touchmove', (e) => { if (isRecording) handleSwipe(e.touches[0].clientX); }, {passive: true}); 
+    
+    function handleSwipe(currentX) { 
+        const diffX = startX - currentX; 
+        if (diffX > 10) micBtn.style.transform = `translateX(-${Math.min(diffX, 150)}px)`; 
+        if (diffX > 120) cancelRecording(); 
     }
 
-    micBtn.addEventListener('mousedown', startRecording); micBtn.addEventListener('touchstart', startRecording, {passive: true});
-    window.addEventListener('mouseup', () => { if (isRecording) stopRecording(); }); window.addEventListener('touchend', () => { if (isRecording) stopRecording(); });
-    window.addEventListener('mousemove', (e) => { if (isRecording) handleSwipe(e.clientX); }); window.addEventListener('touchmove', (e) => { if (isRecording) handleSwipe(e.touches[0].clientX); }, {passive: true});
-    function handleSwipe(currentX) { const diffX = startX - currentX; if (diffX > 10) micBtn.style.transform = `translateX(-${Math.min(diffX, 150)}px)`; if (diffX > 120) cancelRecording(); }
-
-    // --- SOCKET СОБЫТИЯ ---
-    socket.on('user_status_change', (data) => {
-        if (data.username === selectedChatId && !isCurrentChatGroup) updateChatStatus(data.username, false, data.online, data.lastSeen);
-        
-        if (viewingUserProfile === data.username && viewingEntityData && viewingEntityData.type === 'user') {
-            document.getElementById('p-status').textContent = data.lastSeen === 'blocked' ? dict[currentLang].blockedStatus : (data.online ? dict[currentLang].online : formatLastSeen(data.lastSeen));
-        }
-        
-        const dot = document.getElementById(`online-dot-${data.username}`); 
-        if (dot) dot.style.display = (data.online && data.lastSeen !== 'blocked') ? 'block' : 'none';
-        
-        const sub = document.getElementById(`contact-sub-${data.username}`); 
-        if (sub && !data.online && sub.textContent === dict[currentLang].typing) sub.textContent = ''; 
+    socket.on('user_status_change', (data) => { 
+        if (data.username === selectedChatId && !isCurrentChatGroup) updateChatStatus(data.username, false, data.online, data.lastSeen); 
+        if (viewingUserProfile === data.username && viewingEntityData && viewingEntityData.type === 'user') document.getElementById('p-status').textContent = data.lastSeen === 'blocked' ? dict[currentLang].blockedStatus : (data.online ? dict[currentLang].online : formatLastSeen(data.lastSeen)); 
+        const dot = document.getElementById(`online-dot-${data.username}`); if (dot) dot.style.display = (data.online && data.lastSeen !== 'blocked') ? 'block' : 'none'; 
+        const sub = document.getElementById(`contact-sub-${data.username}`); if (sub && !data.online && sub.textContent === dict[currentLang].typing) sub.textContent = ''; 
     });
-
-    socket.on('user_typing', (data) => {
-        if (data.to === selectedChatId) { 
-            chatStatusEl.textContent = dict[currentLang].typing; 
-            chatStatusEl.classList.add('typing'); 
-        }
-        const sub = document.getElementById(`contact-sub-${data.to}`); 
-        if (sub) { sub.textContent = dict[currentLang].typing; sub.classList.add('typing'); }
+    
+    socket.on('user_typing', (data) => { 
+        if (data.to === selectedChatId) { chatStatusEl.textContent = dict[currentLang].typing; chatStatusEl.classList.add('typing'); } 
+        const sub = document.getElementById(`contact-sub-${data.to}`); if (sub) { sub.textContent = dict[currentLang].typing; sub.classList.add('typing'); } 
     });
-
-    socket.on('user_stop_typing', (data) => {
-        if (data.to === selectedChatId) updateChatStatus(selectedChatId, isCurrentChatGroup);
-        const sub = document.getElementById(`contact-sub-${data.to}`); 
-        if (sub) { sub.textContent = ''; sub.classList.remove('typing'); }
+    
+    socket.on('user_stop_typing', (data) => { 
+        if (data.to === selectedChatId) updateChatStatus(selectedChatId, isCurrentChatGroup); 
+        const sub = document.getElementById(`contact-sub-${data.to}`); if (sub) { sub.textContent = ''; sub.classList.remove('typing'); } 
     });
-
-    socket.on('msg_receive', (msg) => {
-        const isCurrentChat = (msg.to === selectedChatId || (msg.from === selectedChatId && msg.to === currentUser.username) || (selectedChatId === 'me' && msg.to === 'me'));
-        
-        if (isCurrentChat) {
-            renderMsg(msg);
-            if (msg.from !== currentUser.username) {
-                document.getElementById('snd-notify').play().catch(()=>{});
+    
+    socket.on('msg_receive', (msg) => { 
+        const isCurrentChat = (msg.to === selectedChatId || (msg.from === selectedChatId && msg.to === currentUser.username) || (selectedChatId === 'me' && msg.to === 'me')); 
+        if (isCurrentChat) { 
+            renderMsg(msg, false); messagesDiv.scrollTop = messagesDiv.scrollHeight; 
+            if (msg.from !== currentUser.username) { 
+                document.getElementById('snd-notify').play().catch(()=>{}); 
                 socket.emit('mark_read', { chatWith: msg.to === currentUser.username ? msg.from : msg.to }); 
-                socket.emit('stop_typing', { to: selectedChatId });
-            } else {
-                document.getElementById('snd-send').play().catch(()=>{});
-            }
-        } else {
-            document.getElementById('snd-notify').play().catch(()=>{});
+                socket.emit('stop_typing', { to: selectedChatId }); 
+            } else document.getElementById('snd-send').play().catch(()=>{}); 
+        } else { 
+            document.getElementById('snd-notify').play().catch(()=>{}); 
             const chatIdForUnread = msg.to === currentUser.username ? msg.from : msg.to; 
-            
-            if(msg.from !== currentUser.username) {
-                unreadCounts[chatIdForUnread] = (unreadCounts[chatIdForUnread] || 0) + 1;
-                updateContactsUI(chatIdForUnread); 
-                
-                if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
-                    new Notification(`Новое сообщение`, { body: msg.text || "Медиафайл", icon: '/icon.png' });
-                }
-            }
-        }
+            if(msg.from !== currentUser.username) { 
+                unreadCounts[chatIdForUnread] = (unreadCounts[chatIdForUnread] || 0) + 1; updateContactsUI(chatIdForUnread); 
+                if ("Notification" in window && Notification.permission === "granted" && document.hidden) new Notification(`Новое сообщение`, { body: msg.text || "Медиафайл", icon: '/icon.png' }); 
+            } 
+        } 
     });
-
-    socket.on('messages_read', (data) => {
+    
+    socket.on('messages_read', (data) => { 
         if (selectedChatId === data.by || selectedChatId === data.chatId) { 
-            document.querySelectorAll('.mine .status-ticks').forEach(el => { 
-                el.classList.add('read'); el.innerHTML = '<i class="fas fa-check"></i><i class="fas fa-check" style="margin-left:-4px"></i>'; 
-            }); 
-        }
+            document.querySelectorAll('.mine .status-ticks').forEach(el => { el.classList.add('read'); el.innerHTML = '<i class="fas fa-check"></i><i class="fas fa-check" style="margin-left:-4px"></i>'; }); 
+        } 
     });
-
+    
     socket.on('msg_deleted', (data) => { const el = document.querySelector(`[data-id="${data.id}"]`); if (el) el.remove(); });
+    
+    socket.on('msg_edited', (data) => { 
+        const row = document.querySelector(`.message-row[data-id="${data.id}"]`); 
+        if (row) { 
+            let textDiv = row.querySelector('.text'); 
+            if (!textDiv) { textDiv = document.createElement('div'); textDiv.className = 'text'; row.querySelector('.bubble').insertBefore(textDiv, row.querySelector('.msg-footer')); } 
+            textDiv.innerHTML = `${data.text} <small style="opacity:0.6; font-size:0.75rem;">(изм.)</small>`; 
+        } 
+    });
+    
+    socket.on('msg_pinned', (data) => { 
+        if (selectedChatId === data.chatId) { 
+            document.getElementById('pinned-banner').classList.remove('hidden'); 
+            document.getElementById('pinned-text').textContent = data.text || "Медиафайл"; 
+        } 
+    });
+    
     socket.on('msg_reaction_update', (data) => { const container = document.getElementById(`reactions-${data.id}`); if (container) container.innerHTML = generateReactionsHtml(data.id, data.reactions); });
-    socket.on('chat_history', (history) => { messagesDiv.innerHTML = ''; history.forEach(renderMsg); });
+    
+    socket.on('chat_history', (data) => { 
+        let history, offset, chatWith, isSearch; 
+        if (Array.isArray(data)) { history = data; offset = 0; isSearch = false; } 
+        else { history = data.history; offset = data.offset; chatWith = data.chatWith; isSearch = data.isSearch; } 
+        
+        if (history.length < 40) hasMoreHistory = false; 
+        const oldScrollHeight = messagesDiv.scrollHeight; 
+        if (offset === 0 || isSearch) messagesDiv.innerHTML = ''; 
+        
+        if (offset === 0 || isSearch) { 
+            history.forEach(msg => renderMsg(msg, false)); 
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; 
+        } else { 
+            for (let i = history.length - 1; i >= 0; i--) renderMsg(history[i], true); 
+            messagesDiv.scrollTop = messagesDiv.scrollHeight - oldScrollHeight; 
+        } 
+        isLoadingHistory = false; 
+    });
+    
     socket.on('contact_toggled', (data) => { if (viewingUserProfile === data.username) updateProfileContactBtn(data.inContacts); socket.emit('get_my_chats'); });
     socket.on('block_toggled', (data) => { if (viewingUserProfile === data.username) updateProfileBlockBtn(data.isBlocked); if (selectedChatId === data.username) openChat(data.username); });
-    
-    socket.on('group_created', (data) => {
-        showToast(dict[currentLang].groupCreated);
-        toggleCreateGroupModal(false);
-        socket.emit('get_my_chats');
-        openChat(data.groupId);
-    });
-
-    socket.on('group_updated', (data) => { 
-        if(selectedChatId === data.groupId) openChat(data.groupId); 
-        if(viewingUserProfile === data.groupId) viewUserProfile(data.groupId);
-        updateContactsUI(data.groupId);
-    });
-
-    socket.on('kicked_from_group', (data) => {
-        showToast("Вы были исключены из чата");
-        if(selectedChatId === data.groupId) { 
-            document.getElementById('chat-ui').classList.add('hidden'); 
-            document.getElementById('welcome-screen').classList.remove('hidden'); 
-        }
-        socket.emit('get_my_chats');
-    });
+    socket.on('group_created', (data) => { showToast(dict[currentLang].groupCreated); toggleCreateGroupModal(false); socket.emit('get_my_chats'); openChat(data.groupId); });
+    socket.on('group_updated', (data) => { if(selectedChatId === data.groupId) openChat(data.groupId); if(viewingUserProfile === data.groupId) viewUserProfile(data.groupId); updateContactsUI(data.groupId); });
+    socket.on('kicked_from_group', (data) => { showToast("Вы были исключены из чата"); if(selectedChatId === data.groupId) { document.getElementById('chat-ui').classList.add('hidden'); document.getElementById('welcome-screen').classList.remove('hidden'); } socket.emit('get_my_chats'); });
 
     searchInput.onkeypress = (e) => { if (e.key === 'Enter' && searchInput.value.trim()) { socket.emit('search_user', searchInput.value.trim().replace('@', '')); } };
     socket.on('search_result', (data) => { if (data.exists) { openChat(data.username); searchInput.value = ''; } else { showToast(dict[currentLang].notFound); } });
-
     socket.on('my_chats_list', (chats) => { contactsDiv.innerHTML = ''; chats.forEach(chatId => updateContactsUI(chatId)); });
 
     async function updateContactsUI(chatId) {
-        if (chatId === currentUser.username) return;
+        if (chatId === currentUser.username) return; 
         let el = document.getElementById(`contact-${chatId}`);
+        if (!el) { 
+            el = document.createElement('div'); 
+            el.id = `contact-${chatId}`; el.className = 'contact-item'; 
+            el.innerHTML = `<div class="avatar-wrapper"><div class="avatar" id="avatar-list-${chatId}"></div><div class="online-dot" id="online-dot-${chatId}"></div></div><div class="contact-info"><strong id="contact-name-${chatId}">${chatId}</strong><div class="contact-subtext" id="contact-sub-${chatId}"></div></div><div class="unread-badge hidden" id="unread-${chatId}">0</div>`; 
+            el.onclick = () => openChat(chatId); 
+            contactsDiv.prepend(el); 
+        } else { 
+            contactsDiv.prepend(el); 
+        }
         
-        if (!el) {
-            el = document.createElement('div'); el.id = `contact-${chatId}`; el.className = 'contact-item';
-            el.innerHTML = `<div class="avatar-wrapper"><div class="avatar" id="avatar-list-${chatId}"></div><div class="online-dot" id="online-dot-${chatId}"></div></div><div class="contact-info"><strong id="contact-name-${chatId}">${chatId}</strong><div class="contact-subtext" id="contact-sub-${chatId}"></div></div><div class="unread-badge hidden" id="unread-${chatId}">0</div>`;
-            el.onclick = () => openChat(chatId);
-            contactsDiv.prepend(el);
-        } else { contactsDiv.prepend(el); }
-        
-        updateUnreadBadge(chatId);
-        
+        updateUnreadBadge(chatId); 
         const res = await fetch(`/api/entity/${chatId}`); 
-        const data = await res.json();
+        const data = await res.json(); 
+        const nameEl = document.getElementById(`contact-name-${chatId}`); 
+        if(nameEl) nameEl.textContent = data.displayName || data.name || chatId; 
         
-        const nameEl = document.getElementById(`contact-name-${chatId}`);
-        if(nameEl) nameEl.textContent = data.displayName || data.name || chatId;
-
         const avEl = document.getElementById(`avatar-list-${chatId}`);
-        if (avEl) {
+        if (avEl) { 
             if (data.isBlocked) { avEl.style.backgroundImage = 'none'; avEl.style.background = 'var(--bg-hover)'; avEl.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } 
             else if (data.avatar) { avEl.style.backgroundImage = `url(${data.avatar})`; avEl.innerHTML = ''; } 
-            else { avEl.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); avEl.style.backgroundImage = 'none'; avEl.innerHTML = ''; }
+            else { avEl.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); avEl.style.backgroundImage = 'none'; avEl.innerHTML = ''; } 
         }
         const dot = document.getElementById(`online-dot-${chatId}`); 
         if (dot) dot.style.display = (data.type === 'user' && data.isOnline && !data.isBlocked) ? 'block' : 'none';
     }
 
-    function sendMediaFile(input) {
-        const file = input.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => { socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: file.type.split('/')[0], data: e.target.result, name: file.name }, reply: replyData }); cancelReply(); };
-        reader.readAsDataURL(file); input.value = '';
-    }
+    function sendMediaFile(input) { const file = input.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: file.type.split('/')[0], data: e.target.result, name: file.name }, reply: replyData }); cancelReply(); }; reader.readAsDataURL(file); input.value = ''; }
+    function updateHeaderUI() { const name = currentUser.name || currentUser.username; document.getElementById('settings-full-name').textContent = name; document.getElementById('settings-username-display').textContent = '@' + currentUser.username; const avatarEl = document.getElementById('user-avatar-main'); if (currentUser.avatar) { avatarEl.style.backgroundImage = `url(${currentUser.avatar})`; avatarEl.textContent = ''; } else { avatarEl.textContent = name[0].toUpperCase(); avatarEl.style.backgroundImage = 'none'; } document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${currentUser.profilePattern || 'none'}`; }
+    async function saveProfileChanges() { const newName = document.getElementById('edit-display-name').value; const newBio = document.getElementById('edit-bio').value; const newBirthday = document.getElementById('edit-birthday').value; const newLocation = document.getElementById('edit-location').value; const newWebsite = document.getElementById('edit-website').value; const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName, bio: newBio, birthday: newBirthday, location: newLocation, website: newWebsite }) }); if (res.ok) { currentUser.name = newName; currentUser.bio = newBio; currentUser.birthday = newBirthday; currentUser.location = newLocation; currentUser.website = newWebsite; updateHeaderUI(); showToast(dict[currentLang].profileUpdated); } }
+    function uploadAvatar(input) { const file = input.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (e) => { const base64Img = e.target.result; const avatarEl = document.getElementById('user-avatar-main'); avatarEl.style.backgroundImage = `url(${base64Img})`; avatarEl.textContent = ''; const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ avatar: base64Img }) }); if (res.ok) { currentUser.avatar = base64Img; showToast(dict[currentLang].photoUpdated); } }; reader.readAsDataURL(file); }
 
-    function updateHeaderUI() {
-        const name = currentUser.name || currentUser.username; 
-        document.getElementById('settings-full-name').textContent = name; 
-        document.getElementById('settings-username-display').textContent = '@' + currentUser.username;
-        const avatarEl = document.getElementById('user-avatar-main');
-        if (currentUser.avatar) { avatarEl.style.backgroundImage = `url(${currentUser.avatar})`; avatarEl.textContent = ''; } 
-        else { avatarEl.textContent = name[0].toUpperCase(); avatarEl.style.backgroundImage = 'none'; }
-        document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${currentUser.profilePattern || 'none'}`;
-    }
-
-    async function saveProfileChanges() {
-        const newName = document.getElementById('edit-display-name').value; 
-        const newBio = document.getElementById('edit-bio').value; 
-        const newBirthday = document.getElementById('edit-birthday').value;
-        const newLocation = document.getElementById('edit-location').value;
-        const newWebsite = document.getElementById('edit-website').value;
-
-        const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName, bio: newBio, birthday: newBirthday, location: newLocation, website: newWebsite }) });
-        if (res.ok) { 
-            currentUser.name = newName; 
-            currentUser.bio = newBio; 
-            currentUser.birthday = newBirthday; 
-            currentUser.location = newLocation;
-            currentUser.website = newWebsite;
-            updateHeaderUI(); 
-            showToast(dict[currentLang].profileUpdated); 
-        }
-    }
-
-    function uploadAvatar(input) {
-        const file = input.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const base64Img = e.target.result; const avatarEl = document.getElementById('user-avatar-main'); 
-            avatarEl.style.backgroundImage = `url(${base64Img})`; avatarEl.textContent = '';
-            const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ avatar: base64Img }) });
-            if (res.ok) { currentUser.avatar = base64Img; showToast(dict[currentLang].photoUpdated); }
-        }; reader.readAsDataURL(file);
-    }
-
-    // Универсальный просмотр профиля (Юзер или Группа/Канал)
     async function viewUserProfile(chatId) {
-        viewingUserProfile = chatId; 
-        const res = await fetch(`/api/entity/${chatId}`); 
-        const data = await res.json();
+        viewingUserProfile = chatId; const res = await fetch(`/api/entity/${chatId}`); const data = await res.json(); viewingEntityData = data; document.getElementById('p-name').textContent = data.displayName || data.name || chatId; document.getElementById('p-username').textContent = '@' + chatId; document.getElementById('p-bio').textContent = data.bio || data.description || dict[currentLang].notSpecified; document.getElementById('p-bio-label').textContent = (data.type === 'group' || data.type === 'channel') ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
+        const pAvatar = document.getElementById('p-avatar'); if (data.isBlocked) { pAvatar.style.backgroundImage = 'none'; pAvatar.style.background = 'var(--bg-hover)'; pAvatar.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } else if (data.avatar) { pAvatar.style.backgroundImage = `url(${data.avatar})`; pAvatar.innerHTML = ''; } else { pAvatar.style.backgroundImage = 'none'; pAvatar.innerHTML = (data.displayName || data.name || chatId)[0].toUpperCase(); }
+        document.getElementById('p-cover').className = `profile-cover pattern-${data.profilePattern || 'none'}`; document.getElementById('p-btn-message').onclick = () => { toggleProfileModal(false); openChat(chatId); };
+        const showField = (id, val) => { const el = document.getElementById(id); if(val) { el.classList.remove('hidden'); el.querySelector('.detail-value').textContent = val; if(id==='p-row-website') el.querySelector('.detail-value').href = val.startsWith('http') ? val : 'https://' + val; } else { el.classList.add('hidden'); } };
         
-        viewingEntityData = data; 
-        
-        document.getElementById('p-name').textContent = data.displayName || data.name || chatId; 
-        document.getElementById('p-username').textContent = '@' + chatId;
-        document.getElementById('p-bio').textContent = data.bio || data.description || dict[currentLang].notSpecified; 
-        document.getElementById('p-bio-label').textContent = (data.type === 'group' || data.type === 'channel') ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
-        
-        const pAvatar = document.getElementById('p-avatar');
-        if (data.isBlocked) { pAvatar.style.backgroundImage = 'none'; pAvatar.style.background = 'var(--bg-hover)'; pAvatar.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } 
-        else if (data.avatar) { pAvatar.style.backgroundImage = `url(${data.avatar})`; pAvatar.innerHTML = ''; } 
-        else { pAvatar.style.backgroundImage = 'none'; pAvatar.innerHTML = (data.displayName || data.name || chatId)[0].toUpperCase(); }
-
-        document.getElementById('p-cover').className = `profile-cover pattern-${data.profilePattern || 'none'}`;
-        document.getElementById('p-btn-message').onclick = () => { toggleProfileModal(false); openChat(chatId); };
-        
-        const showField = (id, val) => { 
-            const el = document.getElementById(id); 
-            if(val) { 
-                el.classList.remove('hidden'); 
-                el.querySelector('.detail-value').textContent = val; 
-                if(id==='p-row-website') el.querySelector('.detail-value').href = val.startsWith('http') ? val : 'https://' + val;
-            } else { 
-                el.classList.add('hidden'); 
-            } 
-        };
-
-        if (data.type === 'group' || data.type === 'channel') {
-            document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()} (${data.type === 'channel' ? dict[currentLang].typeChannel : dict[currentLang].typeGroup})`;
-            
-            document.getElementById('p-row-birthday').classList.add('hidden');
-            showField('p-row-location', null); 
-            showField('p-row-website', null);
-            
-            document.getElementById('p-row-members').classList.remove('hidden');
-            document.getElementById('p-members-count').textContent = data.membersCount;
-            
-            // Админка
-            if(data.isCreator) { 
-                document.getElementById('p-btn-edit').classList.remove('hidden'); 
-            } else { 
-                document.getElementById('p-btn-edit').classList.add('hidden'); 
-            }
-            
-            const mList = document.getElementById('p-members-list'); 
-            mList.innerHTML = ''; 
-            mList.style.display = 'block';
-            
-            data.membersList.forEach(m => {
-                const isMe = m.username === currentUser.username;
-                const kickBtn = (data.isCreator && !isMe) ? `<button class="danger-btn-small" onclick="kickMember('${data.id}', '${m.username}')">${dict[currentLang].kickBtn}</button>` : '';
-                mList.innerHTML += `
-                    <div class="member-option" style="cursor:default">
-                        <span>${m.name} (@${m.username})</span>
-                        ${kickBtn}
-                    </div>`;
-            });
-
-            document.getElementById('p-btn-contact').classList.add('hidden');
-            document.getElementById('p-btn-block').classList.add('hidden');
-            document.getElementById('p-btn-leave').classList.remove('hidden');
-        } else {
-            document.getElementById('p-status').textContent = data.isBlocked ? dict[currentLang].blockedStatus : (data.isOnline ? dict[currentLang].online : formatLastSeen(data.lastSeen));
-            
-            document.getElementById('p-row-members').classList.add('hidden');
-            document.getElementById('p-members-list').style.display = 'none';
-            document.getElementById('p-btn-edit').classList.add('hidden');
-            
-            showField('p-row-birthday', data.birthday ? new Date(data.birthday).toLocaleDateString() : null);
-            showField('p-row-location', data.location); 
-            showField('p-row-website', data.website);
-            
-            document.getElementById('p-btn-contact').classList.remove('hidden');
-            document.getElementById('p-btn-block').classList.remove('hidden');
-            document.getElementById('p-btn-leave').classList.add('hidden');
-            
-            updateProfileContactBtn(data.inContacts);
-            const myRes = await fetch('/my-full-profile'); 
-            const myData = await myRes.json();
-            updateProfileBlockBtn(myData.blocked && myData.blocked.includes(chatId)); 
+        if (data.type === 'group' || data.type === 'channel') { 
+            document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()} (${data.type === 'channel' ? dict[currentLang].typeChannel : dict[currentLang].typeGroup})`; document.getElementById('p-row-birthday').classList.add('hidden'); showField('p-row-location', null); showField('p-row-website', null); document.getElementById('p-row-members').classList.remove('hidden'); document.getElementById('p-members-count').textContent = data.membersCount; if(data.isCreator) { document.getElementById('p-btn-edit').classList.remove('hidden'); } else { document.getElementById('p-btn-edit').classList.add('hidden'); } const mList = document.getElementById('p-members-list'); mList.innerHTML = ''; mList.style.display = 'block'; 
+            data.membersList.forEach(m => { const isMe = m.username === currentUser.username; const kickBtn = (data.isCreator && !isMe) ? `<button class="danger-btn-small" onclick="kickMember('${data.id}', '${m.username}')">${dict[currentLang].kickBtn}</button>` : ''; mList.innerHTML += `<div class="member-option" style="cursor:default"><span>${m.name} (@${m.username})</span>${kickBtn}</div>`; }); 
+            document.getElementById('p-btn-contact').classList.add('hidden'); document.getElementById('p-btn-block').classList.add('hidden'); document.getElementById('p-btn-leave').classList.remove('hidden'); 
+        } else { 
+            document.getElementById('p-status').textContent = data.isBlocked ? dict[currentLang].blockedStatus : (data.isOnline ? dict[currentLang].online : formatLastSeen(data.lastSeen)); document.getElementById('p-row-members').classList.add('hidden'); document.getElementById('p-members-list').style.display = 'none'; document.getElementById('p-btn-edit').classList.add('hidden'); showField('p-row-birthday', data.birthday ? new Date(data.birthday).toLocaleDateString() : null); showField('p-row-location', data.location); showField('p-row-website', data.website); document.getElementById('p-btn-contact').classList.remove('hidden'); document.getElementById('p-btn-block').classList.remove('hidden'); document.getElementById('p-btn-leave').classList.add('hidden'); updateProfileContactBtn(data.inContacts); const myRes = await fetch('/my-full-profile'); const myData = await myRes.json(); updateProfileBlockBtn(myData.blocked && myData.blocked.includes(chatId)); 
         }
-
         toggleProfileModal(true);
     }
 
-    function kickMember(groupId, userId) {
-        if(confirm("Удалить пользователя из сообщества?")) {
-            socket.emit('kick_member', { groupId, userId });
-        }
-    }
+    function kickMember(groupId, userId) { if(confirm("Удалить пользователя из сообщества?")) socket.emit('kick_member', { groupId, userId }); }
+    function toggleContact() { if(!viewingUserProfile || (viewingEntityData && viewingEntityData.type !== 'user')) return; const isContact = document.getElementById('p-icon-contact').className.includes('user-minus'); if (isContact) socket.emit('toggle_contact', {username: viewingUserProfile, remove: true}); else { document.getElementById('contact-custom-name').value = document.getElementById('p-name').textContent; document.getElementById('custom-contact-modal').classList.remove('hidden'); setTimeout(() => document.getElementById('custom-contact-modal').classList.add('show'), 10); } }
+    function saveContact() { socket.emit('toggle_contact', {username: viewingUserProfile, customName: document.getElementById('contact-custom-name').value.trim()}); closeModalOnOuterClick({target: {id: 'custom-contact-modal'}}, 'custom-contact-modal'); }
+    function toggleBlock() { if(viewingUserProfile && viewingEntityData && viewingEntityData.type === 'user') socket.emit('toggle_block', {username: viewingUserProfile}); }
+    function leaveGroup() { if(viewingUserProfile && viewingEntityData && viewingEntityData.type !== 'user') { if(confirm("Вы уверены, что хотите покинуть?")) { socket.emit('leave_group', { groupId: viewingUserProfile }); toggleProfileModal(false); if(selectedChatId === viewingUserProfile) { document.getElementById('chat-ui').classList.add('hidden'); document.getElementById('welcome-screen').classList.remove('hidden'); } } } }
+    function updateProfileContactBtn(inContacts) { const icon = document.getElementById('p-icon-contact'); const text = document.getElementById('p-text-contact'); if (inContacts) { icon.className = 'fas fa-user-minus'; text.textContent = dict[currentLang].removeContact; } else { icon.className = 'fas fa-user-plus'; text.textContent = dict[currentLang].addContact; } }
+    function updateProfileBlockBtn(isBlocked) { const icon = document.querySelector('#p-btn-block i'); const text = document.getElementById('p-text-block'); const btn = document.getElementById('p-btn-block'); if (isBlocked) { icon.className = 'fas fa-unlock'; text.textContent = dict[currentLang].unblockUser; btn.classList.remove('block-btn'); btn.style.color = '#4CAF50'; } else { icon.className = 'fas fa-ban'; text.textContent = dict[currentLang].blockUser; btn.classList.add('block-btn'); btn.style.color = '#ff3b30'; } }
 
-    // --- ЛОГИКА КАСТОМНЫХ КОНТАКТОВ ---
-    function toggleContact() { 
-        if(!viewingUserProfile || (viewingEntityData && viewingEntityData.type !== 'user')) return;
-        
-        const isContact = document.getElementById('p-icon-contact').className.includes('user-minus');
-        if (isContact) {
-            socket.emit('toggle_contact', {username: viewingUserProfile, remove: true});
-        } else {
-            const currentName = document.getElementById('p-name').textContent;
-            document.getElementById('contact-custom-name').value = currentName;
-            document.getElementById('custom-contact-modal').classList.remove('hidden');
-            setTimeout(() => document.getElementById('custom-contact-modal').classList.add('show'), 10);
-        }
-    }
-    
-    function saveContact() {
-        const customName = document.getElementById('contact-custom-name').value.trim();
-        socket.emit('toggle_contact', {username: viewingUserProfile, customName: customName});
-        closeModalOnOuterClick({target: {id: 'custom-contact-modal'}}, 'custom-contact-modal');
-    }
+    async function toggleCreateGroupModal(show, editMode = false) { const modal = document.getElementById('create-group-modal'); if (show) { editModeGroupId = editMode ? viewingEntityData.id : null; document.getElementById('modal-group-title').textContent = editMode ? "Редактировать" : dict[currentLang].createGroup; document.getElementById('submit-group-btn').textContent = editMode ? dict[currentLang].saveBtn : dict[currentLang].createGroupBtn; if (editMode) { document.getElementById('group-type-selector').style.display = 'none'; document.getElementById('group-id-wrapper').style.display = 'none'; document.getElementById('group-members-wrapper').style.display = 'none'; document.getElementById('group-name-input').value = viewingEntityData.name; document.getElementById('group-desc-input').value = viewingEntityData.description; currentGroupAvatarBase64 = viewingEntityData.avatar; document.getElementById('group-avatar-preview').style.backgroundImage = currentGroupAvatarBase64 ? `url(${currentGroupAvatarBase64})` : 'none'; } else { document.getElementById('group-type-selector').style.display = 'flex'; document.getElementById('group-id-wrapper').style.display = 'flex'; document.getElementById('group-members-wrapper').style.display = 'flex'; document.getElementById('group-id-input').value = ''; document.getElementById('group-name-input').value = ''; document.getElementById('group-desc-input').value = ''; document.getElementById('group-avatar-preview').style.backgroundImage = 'none'; currentGroupAvatarBase64 = null; const list = document.getElementById('group-members-list'); list.innerHTML = ''; const res = await fetch('/my-full-profile'); const data = await res.json(); if (data.contacts && data.contacts.length > 0) { for (let contact of data.contacts) { const cUsername = typeof contact === 'object' ? contact.username : contact; const cName = typeof contact === 'object' && contact.customName ? contact.customName : cUsername; list.innerHTML += `<label class="member-option"><span>${cName} (@${cUsername})</span><input type="checkbox" value="${cUsername}"></label>`; } } else { list.innerHTML = `<div style="padding: 10px; color: var(--text-dim); font-size: 0.85rem;">Нет контактов для добавления</div>`; } } modal.classList.remove('hidden'); setTimeout(() => modal.classList.add('show'), 10); } else { modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); } }
+    function openEditGroupModal() { toggleCreateGroupModal(true, true); }
+    function previewGroupAvatar(input) { const file = input.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { currentGroupAvatarBase64 = e.target.result; document.getElementById('group-avatar-preview').style.backgroundImage = `url(${currentGroupAvatarBase64})`; }; reader.readAsDataURL(file); }
+    function submitCreateGroup() { const name = document.getElementById('group-name-input').value.trim(); const desc = document.getElementById('group-desc-input').value.trim(); if (editModeGroupId) { if(!name) { showToast("Укажите название"); return; } socket.emit('update_group_info', { id: editModeGroupId, name: name, description: desc, avatar: currentGroupAvatarBase64 }); toggleCreateGroupModal(false); showToast("Изменения сохранены"); return; } const id = document.getElementById('group-id-input').value.trim(); const type = document.querySelector('input[name="chat-type"]:checked').value; if (!id || !name) { showToast("Укажите ID и Название"); return; } const checkboxes = document.querySelectorAll('#group-members-list input[type="checkbox"]:checked'); const members = Array.from(checkboxes).map(cb => cb.value); if (members.length > 99) { showToast("Максимум 99 участников (плюс вы)"); return; } socket.emit('create_group', { id: id, type: type, name: name, description: desc, avatar: currentGroupAvatarBase64, members: members }); }
 
-    function toggleBlock() { 
-        if(viewingUserProfile && viewingEntityData && viewingEntityData.type === 'user') {
-            socket.emit('toggle_block', {username: viewingUserProfile}); 
-        }
-    }
-    
-    function leaveGroup() {
-        if(viewingUserProfile && viewingEntityData && viewingEntityData.type !== 'user') {
-            if(confirm("Вы уверены, что хотите покинуть?")) {
-                socket.emit('leave_group', { groupId: viewingUserProfile });
-                toggleProfileModal(false);
-                if(selectedChatId === viewingUserProfile) {
-                    document.getElementById('chat-ui').classList.add('hidden');
-                    document.getElementById('welcome-screen').classList.remove('hidden');
-                }
-            }
-        }
-    }
-
-    function updateProfileContactBtn(inContacts) {
-        const icon = document.getElementById('p-icon-contact'); const text = document.getElementById('p-text-contact');
-        if (inContacts) { icon.className = 'fas fa-user-minus'; text.textContent = dict[currentLang].removeContact; } 
-        else { icon.className = 'fas fa-user-plus'; text.textContent = dict[currentLang].addContact; }
-    }
-    
-    function updateProfileBlockBtn(isBlocked) {
-        const icon = document.querySelector('#p-btn-block i'); const text = document.getElementById('p-text-block'); const btn = document.getElementById('p-btn-block');
-        if (isBlocked) { icon.className = 'fas fa-unlock'; text.textContent = dict[currentLang].unblockUser; btn.classList.remove('block-btn'); btn.style.color = '#4CAF50'; } 
-        else { icon.className = 'fas fa-ban'; text.textContent = dict[currentLang].blockUser; btn.classList.add('block-btn'); btn.style.color = '#ff3b30'; }
-    }
-
-    // --- ЛОГИКА СОЗДАНИЯ И РЕДАКТИРОВАНИЯ СООБЩЕСТВ ---
-    async function toggleCreateGroupModal(show, editMode = false) {
-        const modal = document.getElementById('create-group-modal');
-        if (show) {
-            editModeGroupId = editMode ? viewingEntityData.id : null;
-            document.getElementById('modal-group-title').textContent = editMode ? "Редактировать" : dict[currentLang].createGroup;
-            document.getElementById('submit-group-btn').textContent = editMode ? dict[currentLang].saveBtn : dict[currentLang].createGroupBtn;
-            
-            if (editMode) {
-                document.getElementById('group-type-selector').style.display = 'none';
-                document.getElementById('group-id-wrapper').style.display = 'none';
-                document.getElementById('group-members-wrapper').style.display = 'none';
-                
-                document.getElementById('group-name-input').value = viewingEntityData.name;
-                document.getElementById('group-desc-input').value = viewingEntityData.description;
-                currentGroupAvatarBase64 = viewingEntityData.avatar;
-                document.getElementById('group-avatar-preview').style.backgroundImage = currentGroupAvatarBase64 ? `url(${currentGroupAvatarBase64})` : 'none';
-            } else {
-                document.getElementById('group-type-selector').style.display = 'flex';
-                document.getElementById('group-id-wrapper').style.display = 'flex';
-                document.getElementById('group-members-wrapper').style.display = 'flex';
-                
-                document.getElementById('group-id-input').value = ''; 
-                document.getElementById('group-name-input').value = ''; 
-                document.getElementById('group-desc-input').value = '';
-                document.getElementById('group-avatar-preview').style.backgroundImage = 'none'; 
-                currentGroupAvatarBase64 = null;
-                
-                const list = document.getElementById('group-members-list'); list.innerHTML = '';
-                const res = await fetch('/my-full-profile'); const data = await res.json();
-                
-                if (data.contacts && data.contacts.length > 0) {
-                    for (let contact of data.contacts) {
-                        const cUsername = typeof contact === 'object' ? contact.username : contact; 
-                        const cName = typeof contact === 'object' && contact.customName ? contact.customName : cUsername;
-                        list.innerHTML += `
-                            <label class="member-option">
-                                <span>${cName} (@${cUsername})</span>
-                                <input type="checkbox" value="${cUsername}">
-                            </label>`;
-                    }
-                } else { 
-                    list.innerHTML = `<div style="padding: 10px; color: var(--text-dim); font-size: 0.85rem;">Нет контактов для добавления</div>`; 
-                }
-            }
-            modal.classList.remove('hidden'); setTimeout(() => modal.classList.add('show'), 10);
-        } else { 
-            modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); 
-        }
-    }
-
-    function openEditGroupModal() { 
-        toggleCreateGroupModal(true, true); 
-    }
-
-    function previewGroupAvatar(input) {
-        const file = input.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            currentGroupAvatarBase64 = e.target.result;
-            document.getElementById('group-avatar-preview').style.backgroundImage = `url(${currentGroupAvatarBase64})`;
-        }; reader.readAsDataURL(file);
-    }
-
-    function submitCreateGroup() {
-        const name = document.getElementById('group-name-input').value.trim();
-        const desc = document.getElementById('group-desc-input').value.trim();
-        
-        if (editModeGroupId) {
-            if(!name) { showToast("Укажите название"); return; }
-            socket.emit('update_group_info', { id: editModeGroupId, name: name, description: desc, avatar: currentGroupAvatarBase64 });
-            toggleCreateGroupModal(false); 
-            showToast("Изменения сохранены");
-            return;
-        }
-
-        const id = document.getElementById('group-id-input').value.trim();
-        const type = document.querySelector('input[name="chat-type"]:checked').value;
-        
-        if (!id || !name) { showToast("Укажите ID и Название"); return; }
-        
-        const checkboxes = document.querySelectorAll('#group-members-list input[type="checkbox"]:checked');
-        const members = Array.from(checkboxes).map(cb => cb.value);
-        
-        if (members.length > 99) { showToast("Максимум 99 участников (плюс вы)"); return; }
-
-        socket.emit('create_group', { id: id, type: type, name: name, description: desc, avatar: currentGroupAvatarBase64, members: members });
-    }
-
-    function startReply(username, text) {
-        replyData = { username, text }; 
-        document.getElementById('reply-user').innerText = '↩ ' + username; 
-        document.getElementById('reply-text').innerText = text;
-        document.getElementById('reply-preview').classList.remove('hidden'); msgInput.focus();
-    }
-    
-    function cancelReply() { 
-        replyData = null; 
-        document.getElementById('reply-preview').classList.add('hidden'); 
-    }
-    
-    function applySavedPreferences() {
-        const theme = localStorage.getItem('aura-theme') || 'dark'; 
-        const pattern = localStorage.getItem('aura-pattern') || 'none'; 
-        const lang = localStorage.getItem('aura-lang') || 'ru';
-        const glass = localStorage.getItem('aura-glass') || 'off';
-        
-        changeTheme(theme); changePattern(pattern); changeLanguage(lang); changeGlassEffect(glass);
-        
-        document.getElementById('theme-select').value = theme; 
-        document.getElementById('pattern-select').value = pattern; 
-        document.getElementById('lang-select').value = lang;
-        document.getElementById('glass-select').value = glass;
-
-        if(currentUser && currentUser.profilePattern) document.getElementById('profile-pattern-select').value = currentUser.profilePattern;
-    }
-
+    function startReply(username, text) { replyData = { username, text }; document.getElementById('reply-user').innerText = '↩ ' + username; document.getElementById('reply-text').innerText = text; document.getElementById('reply-preview').classList.remove('hidden'); msgInput.focus(); }
+    function cancelReply() { replyData = null; document.getElementById('reply-preview').classList.add('hidden'); }
+    function applySavedPreferences() { const theme = localStorage.getItem('aura-theme') || 'dark'; const pattern = localStorage.getItem('aura-pattern') || 'none'; const lang = localStorage.getItem('aura-lang') || 'ru'; const glass = localStorage.getItem('aura-glass') || 'off'; changeTheme(theme); changePattern(pattern); changeLanguage(lang); changeGlassEffect(glass); document.getElementById('theme-select').value = theme; document.getElementById('pattern-select').value = pattern; document.getElementById('lang-select').value = lang; document.getElementById('glass-select').value = glass; if(currentUser && currentUser.profilePattern) document.getElementById('profile-pattern-select').value = currentUser.profilePattern; }
     function changeTheme(themeName) { document.documentElement.setAttribute('data-theme', themeName); localStorage.setItem('aura-theme', themeName); }
     function changePattern(p) { document.getElementById('app-body').className = `pattern-${p}`; localStorage.setItem('aura-pattern', p); }
-    function changeGlassEffect(state) {
-        if (state === 'on') {
-            document.documentElement.setAttribute('data-glass', 'on');
-            document.getElementById('liquid-bg').classList.remove('hidden');
-        } else {
-            document.documentElement.removeAttribute('data-glass');
-            document.getElementById('liquid-bg').classList.add('hidden');
-        }
-        localStorage.setItem('aura-glass', state);
-    }
-
-    async function changeProfilePattern(p) {
-        document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${p}`;
-        await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ profilePattern: p }) });
-        if(currentUser) currentUser.profilePattern = p;
-    }
-
+    function changeGlassEffect(state) { if (state === 'on') { document.documentElement.setAttribute('data-glass', 'on'); document.getElementById('liquid-bg').classList.remove('hidden'); } else { document.documentElement.removeAttribute('data-glass'); document.getElementById('liquid-bg').classList.add('hidden'); } localStorage.setItem('aura-glass', state); }
+    async function changeProfilePattern(p) { document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${p}`; await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ profilePattern: p }) }); if(currentUser) currentUser.profilePattern = p; }
     function toggleSettings(show) { document.getElementById('settings-drawer').classList.toggle('active', show); }
-    
-    function toggleProfileModal(show) { 
-        const modal = document.getElementById('profile-modal');
-        if (show) { modal.classList.remove('hidden'); setTimeout(() => modal.classList.add('show'), 10); } 
-        else { modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); }
-    }
-    
+    function toggleProfileModal(show) { const modal = document.getElementById('profile-modal'); if (show) { modal.classList.remove('hidden'); setTimeout(() => modal.classList.add('show'), 10); } else { modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); } }
     function closeProfile(e) { if (e.target.id === 'profile-modal') toggleProfileModal(false); }
-    function closeModalOnOuterClick(e, modalId) {
-        if (e.target.id === modalId) {
-            const modal = document.getElementById(modalId);
-            modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300);
-        }
-    }
-
-    function switchSettingsTab(tabId) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        
-        const btn = document.querySelector(`.tab-btn[onclick="switchSettingsTab('${tabId}')"]`); 
-        const content = document.getElementById(`tab-${tabId}`);
-        
-        if(btn) btn.classList.add('active'); 
-        if(content) content.classList.add('active');
-    }
-
-    sendBtn.onclick = send;
+    function closeModalOnOuterClick(e, modalId) { if (e.target.id === modalId) { const modal = document.getElementById(modalId); modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); } }
+    function switchSettingsTab(tabId) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); const btn = document.querySelector(`.tab-btn[onclick="switchSettingsTab('${tabId}')"]`); const content = document.getElementById(`tab-${tabId}`); if(btn) btn.classList.add('active'); if(content) content.classList.add('active'); }
+    
+    sendBtn.onclick = send; 
     msgInput.onkeypress = (e) => { if(e.key === 'Enter') send(); };
-
+    
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 </script>
 </body>
