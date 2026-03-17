@@ -17,7 +17,7 @@ const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 5e7 });
 
 // --- Настройка Telegram Бота (Твой тестовый бот) ---
-const tgToken = '8795912699:AAGNG756DWk2wDZA8fmsRlJSzGjxHvzlK0g';
+const tgToken = '8666406149:AAHJA4-jhQTk2GDfvwfJdtWJejGfpwHvUEs';
 const tgBot = new TelegramBot(tgToken, { polling: true });
 
 // Хранилище временных токенов для привязки Telegram
