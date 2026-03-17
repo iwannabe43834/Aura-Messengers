@@ -19,7 +19,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script src="/socket.io/socket.io.js"></script>
-    
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
     <style>
@@ -63,27 +62,28 @@
 <audio id="snd-send" src="send.mp3" preload="auto"></audio>
 <audio id="snd-notify" src="notify.mp3" preload="auto"></audio>
 
-<div id="call-overlay" class="modal hidden" style="z-index: 3000; background: var(--bg-main);">
-    <div id="call-ui-content" class="modal-content tg-style-profile" style="text-align:center; padding: 40px 20px; border: none; box-shadow: none; background: transparent;">
-        <div class="avatar-huge" id="call-avatar" style="margin: 0 auto 20px; width: 120px; height: 120px; font-size: 3rem;"></div>
-        <h2 id="call-name" style="font-size: 1.8rem; margin-bottom: 10px;">Name</h2>
-        <p id="call-status-text" style="color: var(--primary); font-size: 1.1rem; margin-bottom: 40px;">Звонит...</p>
+<div id="call-overlay" class="modal hidden" style="z-index: 3000; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(15px); transition: opacity 0.3s ease;">
+    <div id="call-ui-content" class="modal-content" style="text-align:center; padding: 40px 20px; border: none; box-shadow: none; background: transparent; height: 100%; display: flex; flex-direction: column; justify-content: center;">
+        <div class="avatar-huge" id="call-avatar" style="margin: 0 auto 20px; width: 130px; height: 130px; font-size: 3.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 4px solid rgba(255,255,255,0.1); background-size: cover; background-position: center; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white;"></div>
+        <h2 id="call-name" style="font-size: 2.2rem; margin-bottom: 5px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); color: #fff;">Name</h2>
+        <p id="call-status-text" style="color: rgba(255,255,255,0.7); font-size: 1.2rem; margin-bottom: 40px; font-weight: 300; letter-spacing: 1px;">Звонит...</p>
         
-        <div id="incoming-call-actions" class="hidden" style="display:flex; justify-content:center; gap:30px;">
-            <button onclick="acceptCall()" style="background:#4ade80; color:#fff; border:none; border-radius:50%; width:70px; height:70px; font-size:1.8rem; cursor:pointer; box-shadow: 0 10px 20px rgba(74,222,128,0.3); transition: 0.2s;"><i class="fas fa-phone"></i></button>
-            <button onclick="rejectCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:70px; height:70px; font-size:1.8rem; cursor:pointer; box-shadow: 0 10px 20px rgba(255,59,48,0.3); transition: 0.2s;"><i class="fas fa-phone-slash"></i></button>
+        <div id="incoming-call-actions" class="hidden" style="display:flex; justify-content:center; gap:40px; margin-top: 20px;">
+            <button onclick="acceptCall()" style="background:#4ade80; color:#fff; border:none; border-radius:50%; width:75px; height:75px; font-size:2rem; cursor:pointer; box-shadow: 0 10px 25px rgba(74,222,128,0.4); transition: 0.2s;"><i class="fas fa-phone"></i></button>
+            <button onclick="rejectCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:75px; height:75px; font-size:2rem; cursor:pointer; box-shadow: 0 10px 25px rgba(255,59,48,0.4); transition: 0.2s;"><i class="fas fa-phone-slash"></i></button>
         </div>
 
-        <div id="active-call-actions" class="hidden" style="display:flex; justify-content:center; gap:20px; position: absolute; bottom: 40px; left: 0; width: 100%; z-index: 10;">
-            <button onclick="toggleVideo()" id="video-toggle-btn" style="background:var(--bg-secondary); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.5rem; cursor:pointer; transition: 0.2s;"><i class="fas fa-video"></i></button>
-            <button onclick="toggleAudio()" id="audio-toggle-btn" style="background:var(--bg-secondary); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.5rem; cursor:pointer; transition: 0.2s;"><i class="fas fa-microphone"></i></button>
-            <button onclick="endCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.5rem; cursor:pointer; box-shadow: 0 10px 20px rgba(255,59,48,0.3); transition: 0.2s;"><i class="fas fa-phone-slash"></i></button>
+        <div id="active-call-actions" class="hidden" style="display:flex; justify-content:center; gap:20px; position: absolute; bottom: 50px; left: 0; width: 100%; z-index: 10; padding: 20px; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);">
+            <button onclick="toggleVideo()" id="video-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s;"><i class="fas fa-video"></i></button>
+            <button onclick="toggleAudio()" id="audio-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s;"><i class="fas fa-microphone"></i></button>
+            <button onclick="toggleRemoteAudio()" id="remote-audio-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s;" title="Замутить собеседника"><i class="fas fa-volume-up"></i></button>
+            <button onclick="endCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; box-shadow: 0 5px 15px rgba(255,59,48,0.4); transition: 0.2s;"><i class="fas fa-phone-slash"></i></button>
         </div>
     </div>
     
     <div id="video-container" class="hidden" style="position:absolute; top:0; left:0; width:100%; height:100%; background:#000; z-index: 1;">
          <video id="remote-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
-         <video id="local-video" autoplay playsinline muted style="width:120px; height:160px; position:absolute; bottom:120px; right:20px; border-radius:12px; object-fit:cover; border:2px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 5;"></video>
+         <video id="local-video" autoplay playsinline muted style="width:120px; height:180px; position:absolute; bottom:140px; right:20px; border-radius:16px; object-fit:cover; border:2px solid rgba(255,255,255,0.5); box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 5;"></video>
     </div>
 </div>
 
@@ -414,11 +414,14 @@
                 </div>
                 
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <button id="header-phone-btn" style="background:none; border:none; color:var(--primary); font-size:1.2rem; cursor:pointer;" onclick="makeCall(false)">
+                    <button id="header-phone-btn" style="background:none; border:none; color:var(--primary); font-size:1.2rem; cursor:pointer;" onclick="makeCall(false)" title="Аудиозвонок">
                         <i class="fas fa-phone"></i>
                     </button>
-                    <button id="header-video-btn" style="background:none; border:none; color:var(--primary); font-size:1.2rem; cursor:pointer; margin-right: 5px;" onclick="makeCall(true)">
+                    <button id="header-video-btn" style="background:none; border:none; color:var(--primary); font-size:1.2rem; cursor:pointer;" onclick="makeCall(true)" title="Видеозвонок">
                         <i class="fas fa-video"></i>
+                    </button>
+                    <button id="header-screen-btn" style="background:none; border:none; color:var(--primary); font-size:1.2rem; cursor:pointer; margin-right: 5px;" onclick="startScreenShare()" title="Демонстрация экрана">
+                        <i class="fas fa-desktop"></i>
                     </button>
                     
                     <button style="background:none; border:none; color:var(--text-dim); font-size:1.2rem; cursor:pointer;" onclick="toggleChatSearch()">
@@ -511,13 +514,28 @@
     const chatStatusEl = document.getElementById('chat-status');
     const contextMenuEl = document.getElementById('msg-context-menu');
 
-    // --- ЛОГИКА WEBRTC И PEERJS ДЛЯ ЗВОНКОВ ---
+    // --- ЛОГИКА WEBRTC И PEERJS ДЛЯ ЗВОНКОВ (ПОЛНОСТЬЮ ОБНОВЛЕННАЯ) ---
     let peer = null;
     let currentCall = null;
     let localStream = null;
     let isVideoCall = false;
+    let isRemoteMuted = false;
+    
+    // Переменные для истории звонков и таймера
+    let callStartTime = null;
+    let callTimerInterval = null;
+    let callInitiator = false;
 
-   function initPeerJS() {
+    // Форматирование миллисекунд в ММ:СС
+    function formatCallDuration(ms) {
+        if (!ms || ms < 0) return "00:00";
+        const totalSec = Math.floor(ms / 1000);
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function initPeerJS() {
         peer = new Peer(currentUser.username, {
             host: window.location.hostname,
             port: window.location.port || (window.location.protocol === 'https:' ? 443 : 80),
@@ -526,8 +544,7 @@
 
         peer.on('call', (incomingCall) => {
             currentCall = incomingCall;
-            
-            // ЧИТАЕМ METADATA: Узнаем, звонят нам с видео или без
+            callInitiator = false; // Мы принимаем звонок, поэтому инициатор - false
             isVideoCall = incomingCall.metadata ? incomingCall.metadata.isVideo : true;
             
             document.getElementById('call-overlay').classList.remove('hidden');
@@ -535,44 +552,44 @@
             
             document.getElementById('incoming-call-actions').classList.remove('hidden');
             document.getElementById('incoming-call-actions').style.display = 'flex';
-            
             document.getElementById('active-call-actions').classList.add('hidden');
             document.getElementById('video-container').classList.add('hidden');
             
             document.getElementById('call-name').textContent = incomingCall.peer;
-            // Пишем правильный текст в зависимости от типа звонка
             document.getElementById('call-status-text').textContent = isVideoCall ? 'Входящий видеозвонок...' : 'Входящий аудиозвонок...';
+            
+            // Подтягиваем аватарку для окна звонка
+            fetch(`/api/entity/${incomingCall.peer}`).then(r => r.json()).then(d => {
+                const av = document.getElementById('call-avatar');
+                if (d.avatar) { 
+                    av.style.backgroundImage = `url(${d.avatar})`; 
+                    av.textContent = ''; 
+                } else { 
+                    av.style.backgroundImage = 'none'; 
+                    av.textContent = (d.displayName || incomingCall.peer)[0].toUpperCase(); 
+                }
+            }).catch(()=>{});
         });
     }
 
-    function closeCallUI() {
-        document.getElementById('call-overlay').classList.add('hidden');
-        
-        // ВОТ ИСПРАВЛЕНИЕ: Прячем кнопки обратно при завершении
-        document.getElementById('incoming-call-actions').classList.add('hidden');
-        document.getElementById('active-call-actions').classList.add('hidden');
-        
-        if (localStream) localStream.getTracks().forEach(track => track.stop());
-        currentCall = null; 
-        localStream = null;
-        document.getElementById('local-video').srcObject = null;
-        document.getElementById('remote-video').srcObject = null;
-    }
-
-   async function makeCall(video) {
+    async function makeCall(video) {
         if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) return showToast("Звонки доступны только один на один");
         isVideoCall = video;
+        callInitiator = true; // Мы инициатор, поэтому запишем историю
         
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ video: isVideoCall, audio: true });
             document.getElementById('local-video').srcObject = localStream;
             
-            // ДОБАВИЛИ METADATA: Передаем собеседнику инфу, видео это или аудио
             currentCall = peer.call(selectedChatId, localStream, { metadata: { isVideo: isVideoCall } });
             showCallActiveUI(selectedChatId, "Звоним...");
             
             currentCall.on('stream', remoteStream => {
-                document.getElementById('call-status-text').textContent = 'Соединение установлено';
+                callStartTime = Date.now();
+                callTimerInterval = setInterval(() => {
+                    const dur = formatCallDuration(Date.now() - callStartTime);
+                    document.getElementById('call-status-text').textContent = `В разговоре: ${dur}`;
+                }, 1000);
                 document.getElementById('remote-video').srcObject = remoteStream;
             });
             
@@ -580,9 +597,50 @@
         } catch(err) { showToast("Нет доступа к микрофону/камере"); }
     }
 
+    async function startScreenShare() {
+        if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) return showToast("Демонстрация доступна только в личных чатах");
+        
+        isVideoCall = true; 
+        callInitiator = true;
+        
+        try {
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            const voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            
+            const combinedTracks = [
+                ...screenStream.getVideoTracks(),
+                ...voiceStream.getAudioTracks()
+            ];
+            localStream = new MediaStream(combinedTracks);
+            
+            document.getElementById('local-video').srcObject = localStream;
+            
+            currentCall = peer.call(selectedChatId, localStream, { metadata: { isVideo: true } });
+            showCallActiveUI(selectedChatId, "Демонстрация экрана...");
+            
+            currentCall.on('stream', remoteStream => {
+                callStartTime = Date.now();
+                callTimerInterval = setInterval(() => {
+                    const dur = formatCallDuration(Date.now() - callStartTime);
+                    document.getElementById('call-status-text').textContent = `Зритель подключился: ${dur}`;
+                }, 1000);
+                document.getElementById('remote-video').srcObject = remoteStream;
+            });
+            
+            currentCall.on('close', closeCallUI);
+
+            screenStream.getVideoTracks()[0].onended = () => {
+                endCall(); 
+                showToast("Демонстрация завершена");
+            };
+
+        } catch(err) { 
+            showToast("Доступ к экрану отменен"); 
+        }
+    }
+
     async function acceptCall() {
         try {
-            // Теперь включаем камеру ТОЛЬКО если это видеозвонок
             localStream = await navigator.mediaDevices.getUserMedia({ video: isVideoCall, audio: true });
             document.getElementById('local-video').srcObject = localStream;
             
@@ -590,6 +648,11 @@
             showCallActiveUI(currentCall.peer, "Соединение установлено");
             
             currentCall.on('stream', remoteStream => {
+                callStartTime = Date.now();
+                callTimerInterval = setInterval(() => {
+                    const dur = formatCallDuration(Date.now() - callStartTime);
+                    document.getElementById('call-status-text').textContent = `В разговоре: ${dur}`;
+                }, 1000);
                 document.getElementById('remote-video').srcObject = remoteStream;
             });
             
@@ -607,31 +670,58 @@
 
     function endCall() {
         if (currentCall) currentCall.close();
-        if (localStream) localStream.getTracks().forEach(track => track.stop());
         closeCallUI();
     }
 
-   function showCallActiveUI(name, status) {
+    function showCallActiveUI(name, status) {
         document.getElementById('call-overlay').classList.remove('hidden');
         document.getElementById('incoming-call-actions').style.display = 'none';
+        document.getElementById('incoming-call-actions').classList.add('hidden');
+        
         document.getElementById('active-call-actions').style.display = 'flex';
         document.getElementById('active-call-actions').classList.remove('hidden');
+        
         document.getElementById('call-name').textContent = name;
         document.getElementById('call-status-text').textContent = status;
         
-        // Показываем видео-окна только при видеозвонке. Иначе оставляем красивый фон с аватаркой!
         if (isVideoCall) {
             document.getElementById('video-container').classList.remove('hidden');
         } else {
             document.getElementById('video-container').classList.add('hidden');
         }
     }
-    
+
     function closeCallUI() {
+        // Останавливаем таймер
+        clearInterval(callTimerInterval);
+        
+        // Считаем длительность
+        let durationStr = "00:00";
+        if (callStartTime) {
+            durationStr = formatCallDuration(Date.now() - callStartTime);
+        }
+
+        // Прячем всё
         document.getElementById('call-overlay').classList.add('hidden');
+        document.getElementById('incoming-call-actions').classList.add('hidden');
+        document.getElementById('active-call-actions').classList.add('hidden');
+        
         if (localStream) localStream.getTracks().forEach(track => track.stop());
+        
+        // Отправляем системное сообщение в чат, если мы были инициатором звонка
+        if (callInitiator && selectedChatId && currentCall) {
+            let textMsg = `📞 Звонок отменен / пропущен`;
+            if (callStartTime) {
+                textMsg = `📞 Звонок завершен. Длительность: ${durationStr}`;
+            }
+            socket.emit('private_msg', { to: selectedChatId, text: textMsg });
+        }
+
         currentCall = null; 
         localStream = null;
+        callStartTime = null;
+        callInitiator = false;
+        
         document.getElementById('local-video').srcObject = null;
         document.getElementById('remote-video').srcObject = null;
     }
@@ -643,7 +733,7 @@
                 audioTrack.enabled = !audioTrack.enabled;
                 const btn = document.getElementById('audio-toggle-btn');
                 btn.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
-                btn.style.background = audioTrack.enabled ? 'var(--bg-secondary)' : '#ff3b30';
+                btn.style.background = audioTrack.enabled ? 'rgba(255,255,255,0.2)' : '#ff3b30';
             }
         }
     }
@@ -655,21 +745,22 @@
                 videoTrack.enabled = !videoTrack.enabled;
                 const btn = document.getElementById('video-toggle-btn');
                 btn.innerHTML = videoTrack.enabled ? '<i class="fas fa-video"></i>' : '<i class="fas fa-video-slash"></i>';
-                btn.style.background = videoTrack.enabled ? 'var(--bg-secondary)' : '#ff3b30';
+                btn.style.background = videoTrack.enabled ? 'rgba(255,255,255,0.2)' : '#ff3b30';
             }
         }
     }
 
+    // НОВАЯ ФУНКЦИЯ: Замутить собеседника
+    function toggleRemoteAudio() {
+        const remoteVid = document.getElementById('remote-video');
+        isRemoteMuted = !isRemoteMuted;
+        remoteVid.muted = isRemoteMuted;
+        
+        const btn = document.getElementById('remote-audio-toggle-btn');
+        btn.innerHTML = isRemoteMuted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>';
+        btn.style.background = isRemoteMuted ? '#ff3b30' : 'rgba(255,255,255,0.2)';
+    }
 
-    let mediaRecorder; 
-    let audioChunks = []; 
-    let isRecording = false; 
-    let recordingTimerId; 
-    let recordingStartTime; 
-    let startX = 0; 
-    let isCancelled = false; 
-    let typingTimer; 
-    const TYPING_TIMEOUT = 2000;
 
     const dict = {
         ru: { 
@@ -795,7 +886,6 @@
             socket.emit('identify', currentUser.username); 
             socket.emit('get_my_chats'); 
             
-            // Инициализация Звонков после успешного входа
             initPeerJS();
 
             document.getElementById('edit-display-name').value = currentUser.name || ''; 
@@ -860,6 +950,7 @@
             readonlyBanner.classList.add('hidden');
             document.getElementById('header-phone-btn').style.display = 'none'; 
             document.getElementById('header-video-btn').style.display = 'none';
+            document.getElementById('header-screen-btn').style.display = 'none';
         } else {
             const res = await fetch(`/api/entity/${chatId}`); 
             const data = await res.json(); 
@@ -892,9 +983,11 @@
             if (isCurrentChatGroup) { 
                 document.getElementById('header-phone-btn').style.display = 'none'; 
                 document.getElementById('header-video-btn').style.display = 'none'; 
+                document.getElementById('header-screen-btn').style.display = 'none'; 
             } else { 
                 document.getElementById('header-phone-btn').style.display = 'inline-block'; 
                 document.getElementById('header-video-btn').style.display = 'inline-block'; 
+                document.getElementById('header-screen-btn').style.display = 'inline-block'; 
             }
 
             updateContactsUI(chatId); 
@@ -904,7 +997,6 @@
         socket.emit('get_history', { chatWith: chatId, offset: 0 }); 
     }
 
-    // Слушатель для пагинации (Бесконечный скролл)
     messagesDiv.addEventListener('scroll', () => { 
         if (messagesDiv.scrollTop === 0 && !isLoadingHistory && hasMoreHistory) { 
             isLoadingHistory = true; 
