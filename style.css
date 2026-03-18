@@ -273,7 +273,7 @@ body {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    border: 2px solid var(--primary); /* Цвет меняется из JS (profileColor) */
+    border: 2px solid var(--primary);
     padding: 3px;
     background-clip: content-box;
     background-size: cover;
@@ -370,13 +370,6 @@ body {
     height: 40px;
     border-radius: 50%;
     border: 2px solid white;
-}
-
-.story-header span {
-    color: white;
-    font-weight: bold;
-    font-size: 1.1rem;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
 }
 
 .story-close {
@@ -625,7 +618,7 @@ body {
     z-index: 1;
     opacity: 0;
     transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1);
-    pointer-events: none; /* Чтобы клики проходили сквозь фон к сообщениям */
+    pointer-events: none;
 }
 
 .chat-bg-layer.active {
@@ -735,40 +728,51 @@ body {
     position: relative;
 }
 
-/* --- СООБЩЕНИЯ (ПУЗЫРИ) --- */
+/* --- СООБЩЕНИЯ (ИДЕАЛЬНОЕ ВЫРАВНИВАНИЕ) --- */
 .message-row { 
     display: flex; 
     width: 100%; 
     align-items: flex-end; 
     gap: 10px; 
+    margin-bottom: 5px;
     animation: slideInUp 0.4s var(--spring-bouncy); 
 }
 
-.message-row.mine { justify-content: flex-start; flex-direction: row-reverse; }
-.message-row.other { justify-content: flex-start; flex-direction: row; }
+.message-row.mine { 
+    justify-content: flex-end !important; 
+    flex-direction: row !important; 
+}
+
+.message-row.other { 
+    justify-content: flex-start !important; 
+    flex-direction: row !important; 
+}
 
 .bubble {
     max-width: 65%;
     padding: 10px 16px;
-    border-radius: 16px;
     font-size: 0.95rem;
     line-height: 1.45;
     position: relative;
     box-shadow: var(--shadow-soft);
     word-wrap: break-word;
-    /* Адаптация цвета под обои */
     background-blend-mode: overlay;
 }
 
 .mine .bubble { 
     background: color-mix(in srgb, var(--bubble-mine) 80%, var(--chat-tint)); 
     color: var(--bubble-text-mine); 
+    border-radius: 16px;
     border-bottom-right-radius: 4px; 
+    margin-left: auto;
 }
+
 .other .bubble { 
     background: color-mix(in srgb, var(--bubble-other) 80%, var(--chat-tint)); 
     color: var(--bubble-text-other); 
+    border-radius: 16px;
     border-bottom-left-radius: 4px; 
+    margin-right: auto;
 }
 
 .msg-sender-name {
@@ -925,7 +929,7 @@ body {
     border-radius: 16px;
     min-width: 220px;
     box-shadow: var(--shadow-modal);
-    z-index: 2000;
+    z-index: 2500;
     display: none;
     flex-direction: column;
     overflow: hidden;
@@ -1074,7 +1078,7 @@ body {
     width: 400px; 
     height: 100%; 
     background: var(--bg-sidebar); 
-    z-index: 1000; 
+    z-index: 2500; 
     transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease, left 0.4s var(--spring-soft); 
     display: flex; 
     flex-direction: column; 
@@ -1094,7 +1098,6 @@ body {
 .back-btn { background: none; border: none; color: var(--text-dim); font-size: 1.4rem; cursor: pointer; transition: 0.2s; }
 .back-btn:hover { color: var(--primary); }
 
-/* Кастомный фон профиля в настройках */
 .user-profile-preview { 
     padding: 40px 20px; 
     text-align: center; 
@@ -1104,7 +1107,6 @@ body {
     overflow: hidden;
 }
 
-/* Затемнение для кастомных фонов профиля, чтобы текст читался */
 .user-profile-preview::before {
     content: '';
     position: absolute;
@@ -1126,6 +1128,13 @@ body {
     font-size: 3rem; 
     box-shadow: var(--shadow-modal);
     transition: transform 0.3s;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    background-size: cover;
+    background-position: center;
 }
 
 .avatar-huge:hover { transform: scale(1.05); }
@@ -1150,7 +1159,6 @@ body {
 .settings-list { padding: 25px; display: none; flex-direction: column; gap: 22px; }
 .settings-list.active { display: flex; }
 
-/* Новая каскадная анимация элементов в настройках */
 .settings-list.active .settings-input-group,
 .settings-list.active .primary-btn-small,
 .settings-list.active .danger-btn {
@@ -1213,7 +1221,6 @@ body {
 
 .settings-divider { height: 1px; background-color: var(--border); margin: 20px 0; }
 
-/* ФИКС ПРОКРУТКИ НАСТРОЕК НА МОБИЛКЕ */
 .drawer-content { overflow-y: auto !important; height: calc(100vh - 60px) !important; padding-bottom: 120px !important; -webkit-overflow-scrolling: touch; }
 .drawer-content::-webkit-scrollbar { display: none; }
 
@@ -1225,7 +1232,6 @@ body {
     width: 100%; 
     height: 100%; 
     background: rgba(0,0,0,0.8); 
-    /* Профиль будет 2000, Контакты и Группы будут иметь 2100 (переопределено в HTML) */
     z-index: 2000; 
     display: flex; 
     align-items: center; 
@@ -1297,6 +1303,13 @@ body {
     transition: transform 0.3s var(--spring-soft); 
     z-index: 2;
     position: relative;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    background-size: cover;
+    background-position: center;
 }
 .profile-avatar-large:hover { transform: scale(1.05); }
 
@@ -1452,12 +1465,10 @@ body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 var(--glass-highlight);
 }
 
-/* Фикс: чтобы стекло не обрезало обои, прозрачный фон */
 [data-glass="on"] .chat-area { background: transparent; }
 [data-glass="on"] .messages-container { padding-bottom: 20px; }
 [data-glass="on"] .contacts-list { padding-bottom: 120px; }
 
-/* Для чата с обоями: шапка и футер становятся стеклянными, а сообщения прозрачными, чтобы видеть фон */
 .chat-area.has-wallpaper .chat-header {
     background: rgba(20, 25, 35, 0.6) !important;
     backdrop-filter: blur(25px) saturate(200%);
@@ -1472,6 +1483,41 @@ body {
     border-top: 1px solid rgba(255,255,255,0.1);
 }
 
+/* --- МАГИЯ ЗАКРУГЛЕНИЙ ДЛЯ ЖИДКОГО СТЕКЛА --- */
+[data-glass="on"] .settings-input-group input, 
+[data-glass="on"] .settings-input-group select,
+[data-glass="on"] .primary-btn-small,
+[data-glass="on"] .danger-btn,
+[data-glass="on"] .modal-form-group input,
+[data-glass="on"] .modal-form-group textarea,
+[data-glass="on"] .type-selector label,
+[data-glass="on"] .custom-voice-player {
+    border-radius: 20px !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+[data-glass="on"] .settings-input-group input:focus, 
+[data-glass="on"] .settings-input-group select:focus { 
+    background: rgba(0, 0, 0, 0.3) !important; border-color: var(--primary); 
+}
+
+[data-glass="on"] .primary-btn-small { 
+    background: rgba(135, 116, 225, 0.35) !important; 
+    backdrop-filter: blur(25px); 
+    border: 1px solid rgba(255,255,255,0.2); 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2), inset 0 1px 1px var(--glass-highlight); 
+}
+
+[data-glass="on"] .danger-btn { 
+    background: rgba(255, 59, 48, 0.2) !important; 
+    backdrop-filter: blur(25px); 
+    border: 1px solid rgba(255,59,48,0.3); 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2), inset 0 1px 1px var(--glass-highlight); 
+}
+
 [data-glass="on"] .input-container {
     position: relative; margin: 0 auto 20px auto; width: calc(100% - 40px); max-width: 900px;
     background: var(--glass-bg); backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
@@ -1482,14 +1528,23 @@ body {
 
 [data-glass="on"] .welcome-content { background: var(--glass-bg); backdrop-filter: blur(40px) saturate(200%); border: 1px solid var(--glass-border); border-radius: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.3), inset 0 1px 2px var(--glass-highlight); }
 [data-glass="on"] .bubble { backdrop-filter: blur(30px) saturate(180%); border: 1px solid var(--glass-border); border-radius: 22px; box-shadow: 0 8px 20px -4px rgba(0,0,0,0.15), inset 0 1px 1px var(--glass-highlight); overflow: hidden; }
-[data-glass="on"] .mine .bubble { background: color-mix(in srgb, var(--bubble-mine) 50%, var(--chat-tint)); border-bottom-right-radius: 6px; }
-[data-glass="on"] .other .bubble { background: color-mix(in srgb, var(--bubble-other) 50%, var(--chat-tint)); border-bottom-left-radius: 6px; }
+[data-glass="on"] .message-row.mine .bubble { background: color-mix(in srgb, var(--bubble-mine) 50%, var(--chat-tint)); border-bottom-right-radius: 6px; }
+[data-glass="on"] .message-row.other .bubble { background: color-mix(in srgb, var(--bubble-other) 50%, var(--chat-tint)); border-bottom-left-radius: 6px; }
 
 [data-glass="on"] .custom-context-menu { background: var(--glass-bg); backdrop-filter: blur(50px) saturate(250%); border-radius: 28px; border: 1px solid var(--glass-border); box-shadow: 0 25px 50px rgba(0,0,0,0.4), inset 0 1px 2px var(--glass-highlight); }
 [data-glass="on"] .tg-style-profile { background: var(--glass-bg); backdrop-filter: blur(50px) saturate(250%) brightness(1.1); border-radius: 36px; border: 1px solid var(--glass-border); box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 2px 3px var(--glass-highlight); }
-[data-glass="on"] .profile-details-card, [data-glass="on"] .custom-name-row, [data-glass="on"] .settings-input-group input, [data-glass="on"] .settings-input-group select, [data-glass="on"] .search-wrapper input { background: rgba(0,0,0,0.2); backdrop-filter: blur(15px); border: 1px solid var(--glass-border); border-radius: 16px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+[data-glass="on"] .profile-details-card, [data-glass="on"] .custom-name-row, [data-glass="on"] .search-wrapper input { background: rgba(0,0,0,0.2); backdrop-filter: blur(15px); border-radius: 20px !important; border: 1px solid var(--glass-border); box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
 [data-glass="on"] .modal.show .tg-style-profile { animation: iosSpring26 0.7s var(--spring-bouncy) forwards; }
 [data-glass="on"] .mobile-bottom-nav { background: var(--glass-bg); backdrop-filter: blur(50px) saturate(220%) brightness(1.05); -webkit-backdrop-filter: blur(50px) saturate(220%) brightness(1.05); border-top: 1px solid var(--glass-border); box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3); }
+
+[data-glass="on"] .mobile-bottom-nav .nav-item { background: transparent; }
+[data-glass="on"] .mobile-bottom-nav .nav-item.active { background: rgba(255,255,255,0.08); border-radius: 16px; margin: 4px; padding: 6px 0 4px 0; }
+
+[data-glass="on"] .settings-tabs { background: rgba(0,0,0,0.15); border-radius: 16px; padding: 4px; border: 1px solid var(--glass-border); margin-bottom: 20px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); }
+[data-glass="on"] .tab-btn { background: transparent; border: none; border-radius: 12px; transition: 0.3s; color: var(--text-dim); }
+[data-glass="on"] .tab-btn.active { background: rgba(255,255,255,0.15); color: var(--text-main); box-shadow: 0 4px 10px rgba(0,0,0,0.1), inset 0 1px 1px var(--glass-highlight); }
+[data-glass="on"] .type-selector input:checked + label { background: rgba(135, 116, 225, 0.4); border-color: rgba(255,255,255,0.2); }
+
 
 /* =========================================
    КРАСИВЫЙ ЭКРАН ЗВОНКА (ГРАДИЕНТЫ И ПУЛЬСАЦИЯ)
