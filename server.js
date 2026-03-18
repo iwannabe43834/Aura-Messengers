@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
+const SQLiteStore = require('connect-sqlite3')(session); // ДОБАВЛЕНО: Хранилище сессий
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
 const sqlite3 = require('sqlite3');
@@ -20,10 +21,14 @@ const io = new Server(server, { maxHttpBufferSize: 5e7 });
 const tgToken = '8666406149:AAHJA4-jhQTk2GDfvwfJdtWJejGfpwHvUEs';
 const tgBot = new TelegramBot(tgToken, { polling: true });
 
-// Хранилище временных токенов для привязки Telegram
-const pendingTgBinds = {};
+// Игнорируем ошибку 409 (когда бот запущен в двух местах)
+tgBot.on('polling_error', (error) => {
+    if (error.code !== 'ETELEGRAM' || !error.message.includes('409 Conflict')) {
+        console.error('Telegram Polling Error:', error.message);
+    }
+});
 
-tgBot.on('message', (msg) => {
+tgBot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text || '';
 
@@ -31,9 +36,11 @@ tgBot.on('message', (msg) => {
     if (text.startsWith('/start ')) {
         const token = text.split(' ')[1];
         
-        if (pendingTgBinds[token]) {
-            pendingTgBinds[token].chatId = chatId;
-            pendingTgBinds[token].bound = true;
+        // Ищем токен в базе данных
+        const row = await db.get('SELECT * FROM temp_tg_binds WHERE token = ?', [token]);
+        
+        if (row) {
+            await db.run('UPDATE temp_tg_binds SET chatId = ?, bound = 1 WHERE token = ?', [chatId, token]);
             tgBot.sendMessage(chatId, "✅ Telegram успешно привязан к Aura Messenger! Возвращайтесь на сайт, регистрация продолжится автоматически.");
         } else {
             tgBot.sendMessage(chatId, "❌ Ссылка устарела или недействительна. Попробуйте нажать кнопку привязки на сайте еще раз.");
@@ -69,9 +76,11 @@ app.use(express.static(__dirname));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+// НАСТРОЙКА СЕССИЙ (чтобы не выкидывало из аккаунта)
 app.use(session({
+    store: new SQLiteStore({ db: 'sessions.db', dir: __dirname }),
     secret: 'aura-secret-key-2026-pro',
-    resave: true,
+    resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 7 * 24 * 60 * 60 * 1000, secure: false }
 }));
@@ -125,6 +134,17 @@ async function initDB() {
             deletedFor TEXT
         )
     `);
+
+    // Таблица для хранения временных токенов привязки Telegram
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS temp_tg_binds (
+            token TEXT PRIMARY KEY,
+            chatId INTEGER,
+            bound INTEGER DEFAULT 0,
+            createdAt INTEGER
+        )
+    `);
+
     console.log("✅ База данных SQLite успешно инициализирована!");
 }
 initDB();
@@ -146,19 +166,20 @@ function saveBase64ToFile(base64String, extensionHint) {
 }
 
 // --- API ДЛЯ ПРИВЯЗКИ TELEGRAM ---
-app.get('/api/generate-tg-token', (req, res) => {
+app.get('/api/generate-tg-token', async (req, res) => {
     const token = 'bind_' + Math.random().toString(36).substr(2, 9);
-    pendingTgBinds[token] = { bound: false, chatId: null };
-    // Удаляем токен через 10 минут, если не привязали
-    setTimeout(() => delete pendingTgBinds[token], 10 * 60 * 1000);
+    // Сохраняем в БД вместо переменной
+    await db.run('INSERT INTO temp_tg_binds (token, createdAt) VALUES (?, ?)', [token, Date.now()]);
     res.json({ token });
 });
 
-app.get('/api/check-tg-token', (req, res) => {
+app.get('/api/check-tg-token', async (req, res) => {
     const token = req.query.token;
-    if (pendingTgBinds[token] && pendingTgBinds[token].bound) {
-        const chatId = pendingTgBinds[token].chatId;
-        delete pendingTgBinds[token]; // Удаляем после успешного использования
+    const row = await db.get('SELECT * FROM temp_tg_binds WHERE token = ?', [token]);
+
+    if (row && row.bound === 1) {
+        const chatId = row.chatId;
+        await db.run('DELETE FROM temp_tg_binds WHERE token = ?', [token]); // Удаляем после успеха
         res.json({ bound: true, chatId });
     } else {
         res.json({ bound: false });
@@ -200,7 +221,6 @@ app.post('/api/send-auth-code', async (req, res) => {
     verificationCodes[username] = { code, timestamp: Date.now() };
 
     if (method === 'telegram' && user.telegram) {
-        // Теперь user.telegram хранит надежный числовой ID (chatId)
         const chatId = user.telegram;
         const text = isReset ? `🔐 Код для сброса пароля Aura: *${code}*` : `🔑 Ваш код для входа в Aura: *${code}*`;
         try {
