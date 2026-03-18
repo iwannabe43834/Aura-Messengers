@@ -4,7 +4,6 @@ const { Server } = require('socket.io');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
 const sqlite3 = require('sqlite3');
@@ -23,6 +22,7 @@ const tgBot = new TelegramBot(tgToken, {
     polling: true 
 });
 
+// Игнорируем ошибку 409
 tgBot.on('polling_error', (error) => {
     if (error.code !== 'ETELEGRAM' || !error.message.includes('409 Conflict')) {
         console.error('Telegram Polling Error:', error.message);
@@ -35,6 +35,7 @@ tgBot.on('message', async (msg) => {
 
     if (text.startsWith('/start ')) {
         const token = text.split(' ')[1];
+        
         const row = await db.get('SELECT * FROM temp_tg_binds WHERE token = ?', [token]);
         
         if (row) {
@@ -48,6 +49,7 @@ tgBot.on('message', async (msg) => {
     }
 });
 
+// --- HTML Шаблон для письма ---
 function getEmailTemplate(code) { 
     return ` 
     <div style="font-family: -apple-system, sans-serif; background-color: #f0f2f5; padding: 40px 20px; text-align: center;"> 
@@ -72,17 +74,18 @@ function getEmailTemplate(code) {
 
 const verificationCodes = {};
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// --- Настройки сервера ---
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(__dirname));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+// Сессии храним в памяти, чтобы не было конфликтов при перезагрузке
 app.use(session({
-    store: new SQLiteStore({ db: 'sessions.db', dir: __dirname }),
     secret: 'aura-secret-key-2026-pro',
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     cookie: { 
         maxAge: 7 * 24 * 60 * 60 * 1000, 
         secure: false 
@@ -94,14 +97,23 @@ const GROUPS_FILE = path.join(__dirname, 'groups.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
 function initFiles() {
-    if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, JSON.stringify({}));
-    if (!fs.existsSync(GROUPS_FILE)) fs.writeFileSync(GROUPS_FILE, JSON.stringify({}));
-    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
+    if (!fs.existsSync(USERS_FILE)) {
+        fs.writeFileSync(USERS_FILE, JSON.stringify({}));
+    }
+    if (!fs.existsSync(GROUPS_FILE)) {
+        fs.writeFileSync(GROUPS_FILE, JSON.stringify({}));
+    }
+    if (!fs.existsSync(UPLOADS_DIR)) {
+        fs.mkdirSync(UPLOADS_DIR);
+    }
 }
 
 function readData(file) {
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } 
-    catch (e) { return {}; }
+    try { 
+        return JSON.parse(fs.readFileSync(file, 'utf8')); 
+    } catch (e) { 
+        return {}; 
+    }
 }
 
 function writeData(file, data) {
@@ -144,6 +156,7 @@ async function initDB() {
         )
     `);
 
+    // ТАБЛИЦА ДЛЯ ИСТОРИЙ С ПРОСМОТРАМИ И РЕАКЦИЯМИ
     await db.exec(`
         CREATE TABLE IF NOT EXISTS stories (
             id TEXT PRIMARY KEY,
@@ -157,6 +170,7 @@ async function initDB() {
         )
     `);
 
+    // Безопасное обновление старой базы историй, если она уже была создана
     try { await db.exec(`ALTER TABLE stories ADD COLUMN views TEXT DEFAULT '[]'`); } catch(e){}
     try { await db.exec(`ALTER TABLE stories ADD COLUMN reactions TEXT DEFAULT '{}'`); } catch(e){}
 
@@ -166,11 +180,15 @@ initDB();
 
 function saveBase64ToFile(base64String, extensionHint) {
     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
+    if (!matches || matches.length !== 3) {
+        return null;
+    }
     
     const buffer = Buffer.from(matches[2], 'base64');
     let ext = extensionHint.split('.').pop();
-    if (ext === extensionHint) ext = matches[1].split('/')[1] || 'bin'; 
+    if (ext === extensionHint) {
+        ext = matches[1].split('/')[1] || 'bin'; 
+    }
     
     const fileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}.${ext}`;
     const filePath = path.join(UPLOADS_DIR, fileName);
@@ -179,6 +197,7 @@ function saveBase64ToFile(base64String, extensionHint) {
     return `/uploads/${fileName}`;
 }
 
+// --- API ДЛЯ ПРИВЯЗКИ TELEGRAM ---
 app.get('/api/generate-tg-token', async (req, res) => {
     const token = 'bind_' + Math.random().toString(36).substr(2, 9);
     await db.run('INSERT INTO temp_tg_binds (token, createdAt) VALUES (?, ?)', [token, Date.now()]);
@@ -198,6 +217,7 @@ app.get('/api/check-tg-token', async (req, res) => {
     }
 });
 
+// --- МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ ---
 app.post('/api/check-user', (req, res) => {
     const { loginId } = req.body;
     const users = readData(USERS_FILE);
@@ -214,7 +234,12 @@ app.post('/api/check-user', (req, res) => {
     }
 
     if (targetUser) {
-        res.json({ exists: true, username: targetUsername, hasEmail: !!targetUser.email, hasTelegram: !!targetUser.telegram });
+        res.json({ 
+            exists: true, 
+            username: targetUsername, 
+            hasEmail: !!targetUser.email, 
+            hasTelegram: !!targetUser.telegram 
+        });
     } else {
         res.json({ exists: false });
     }
@@ -225,15 +250,18 @@ app.post('/api/send-auth-code', async (req, res) => {
     const users = readData(USERS_FILE);
     const user = users[username];
     
-    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (!user) {
+        return res.status(404).json({ error: 'Пользователь не найден' });
+    }
 
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     verificationCodes[username] = { code, timestamp: Date.now() };
 
     if (method === 'telegram' && user.telegram) {
+        const chatId = user.telegram;
         const text = isReset ? `🔐 Код для сброса пароля Aura: *${code}*` : `🔑 Ваш код для входа в Aura: *${code}*`;
         try {
-            await tgBot.sendMessage(user.telegram, text, { parse_mode: 'Markdown' });
+            await tgBot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
             return res.json({ success: true, message: 'Код отправлен в Telegram' });
         } catch (err) {
             return res.status(500).json({ error: 'Ошибка отправки в Telegram' });
@@ -242,7 +270,11 @@ app.post('/api/send-auth-code', async (req, res) => {
         try {
             const response = await fetch('https://api.brevo.com/v3/smtp/email', {
                 method: 'POST',
-                headers: { 'accept': 'application/json', 'api-key': process.env.BREVO_API_KEY || '', 'content-type': 'application/json' },
+                headers: { 
+                    'accept': 'application/json', 
+                    'api-key': process.env.BREVO_API_KEY || '', 
+                    'content-type': 'application/json' 
+                },
                 body: JSON.stringify({
                     sender: { name: "Aura Messenger", email: "auramessengercode@gmail.com" },
                     to: [{ email: user.email }],
@@ -251,7 +283,12 @@ app.post('/api/send-auth-code', async (req, res) => {
                     textContent: `Здравствуйте! Ваш код: ${code}`
                 })
             });
-            res.status(200).json({ success: true, message: 'Код отправлен на E-mail' });
+
+            if (response.ok) {
+                res.status(200).json({ success: true, message: 'Код отправлен на E-mail' });
+            } else {
+                res.status(200).json({ success: true, message: 'Режим отладки: письмо не ушло' });
+            }
         } catch (error) { 
             res.status(200).json({ success: true, message: 'Режим отладки: ошибка сети' }); 
         }
@@ -365,32 +402,29 @@ app.get('/logout', (req, res) => {
 });
 
 app.get('/my-full-profile', (req, res) => {
-    if (!req.session.username) {
+    const sessionUser = req.session.username || req.headers['x-user-id'];
+    if (!sessionUser) {
         return res.status(401).json({ error: 'Not logged in' });
     }
     
     const users = readData(USERS_FILE);
-    const user = users[req.session.username];
+    const user = users[sessionUser];
     
     if (!user) {
         return res.status(404).json({ error: 'Not found' });
     }
     
     const { password, ...safeUser } = user;
-    res.json({ username: req.session.username, ...safeUser });
+    res.json({ username: sessionUser, ...safeUser });
 });
 
 app.post('/update-profile', (req, res) => {
-    if (!req.session.username) {
-        return res.status(401).json({ error: 'Not logged in' });
-    }
+    const sessionUser = req.session.username || req.headers['x-user-id'];
+    if (!sessionUser) return res.status(401).json({ error: 'Not logged in' });
     
     const users = readData(USERS_FILE);
-    const user = users[req.session.username];
-    
-    if (!user) {
-        return res.status(404).json({ error: 'Not found' });
-    }
+    const user = users[sessionUser];
+    if (!user) return res.status(404).json({ error: 'Not found' });
     
     if (req.body.name !== undefined) user.name = req.body.name;
     if (req.body.bio !== undefined) user.bio = req.body.bio;
@@ -403,13 +437,19 @@ app.post('/update-profile', (req, res) => {
     if (req.body.privacy !== undefined) user.privacy = { ...user.privacy, ...req.body.privacy };
     
     writeData(USERS_FILE, users);
-    io.emit('user_updated', { username: req.session.username, user: user });
+
+    // Безопасно отдаем обновленного юзера (username теперь точно есть)
+    const safeUser = { username: sessionUser, ...user };
+    delete safeUser.password;
+
+    io.emit('user_updated', { username: sessionUser, user: safeUser });
     
     res.json({ success: true });
 });
 
+// --- ЧТЕНИЕ ПРОФИЛЕЙ С УЧЕТОМ ПРИВАТНОСТИ И ГРУПП ---
 app.get('/api/entity/:id', (req, res) => {
-    const callerId = req.session.username;
+    const callerId = req.session.username || req.headers['x-user-id'];
     const id = req.params.id;
     const users = readData(USERS_FILE);
     const groups = readData(GROUPS_FILE);
@@ -470,13 +510,21 @@ app.get('/api/entity/:id', (req, res) => {
     let canGroup = true;
 
     if (user.privacy) {
-        if (user.privacy.online === 'nobody') showOnline = false;
-        else if (user.privacy.online === 'contacts' && !isContactForThem) showOnline = false;
+        if (user.privacy.online === 'nobody') {
+            showOnline = false;
+        } else if (user.privacy.online === 'contacts' && !isContactForThem) {
+            showOnline = false;
+        }
 
-        if (user.privacy.calls === 'nobody') canCall = false;
-        else if (user.privacy.calls === 'contacts' && !isContactForThem) canCall = false;
+        if (user.privacy.calls === 'nobody') {
+            canCall = false;
+        } else if (user.privacy.calls === 'contacts' && !isContactForThem) {
+            canCall = false;
+        }
         
-        if (user.privacy.groups === 'contacts' && !isContactForThem) canGroup = false;
+        if (user.privacy.groups === 'contacts' && !isContactForThem) {
+            canGroup = false;
+        }
     }
 
     res.json({
@@ -520,10 +568,13 @@ io.on('connection', (socket) => {
         for (let otherUser in onlineUsers) {
             let canSee = true;
             if (u && u.privacy) {
-                if (u.privacy.online === 'nobody') canSee = false;
-                else if (u.privacy.online === 'contacts') {
+                if (u.privacy.online === 'nobody') {
+                    canSee = false;
+                } else if (u.privacy.online === 'contacts') {
                     const isContactForThem = u.contacts && u.contacts.some(c => (typeof c === 'object' ? c.username : c) === otherUser);
-                    if (!isContactForThem) canSee = false;
+                    if (!isContactForThem) {
+                        canSee = false;
+                    }
                 }
             }
             if (canSee) {
@@ -542,8 +593,12 @@ io.on('connection', (socket) => {
         const rows = await db.all(`SELECT fromUser, toUser FROM messages WHERE fromUser = ? OR toUser = ?`, [currentUsername, currentUsername]);
         
         rows.forEach(r => {
-            if (r.fromUser === currentUsername && !groups[r.toUser]) chats.add(r.toUser);
-            if (r.toUser === currentUsername && !groups[r.fromUser]) chats.add(r.fromUser);
+            if (r.fromUser === currentUsername && !groups[r.toUser]) {
+                chats.add(r.toUser);
+            }
+            if (r.toUser === currentUsername && !groups[r.fromUser]) {
+                chats.add(r.fromUser);
+            }
         });
         
         if (myUser && myUser.contacts) {
@@ -554,7 +609,9 @@ io.on('connection', (socket) => {
         let chatsArray = Array.from(chats);
 
         for (const groupId in groups) {
-            if (groups[groupId].members.includes(currentUsername)) chatsArray.push(groupId);
+            if (groups[groupId].members.includes(currentUsername)) {
+                chatsArray.push(groupId);
+            }
         }
         
         socket.emit('my_chats_list', chatsArray);
@@ -576,7 +633,9 @@ io.on('connection', (socket) => {
             historyRows = await db.all(`SELECT * FROM messages WHERE toUser = ? ORDER BY id DESC LIMIT 40 OFFSET ?`, [chatWith, offset]);
             if (offset === 0) {
                 const pinnedRow = await db.get(`SELECT * FROM messages WHERE toUser = ? AND isPinned = 1 ORDER BY id DESC LIMIT 1`, [chatWith]);
-                if (pinnedRow) socket.emit('msg_pinned', { id: pinnedRow.id, text: pinnedRow.text, chatId: chatWith });
+                if (pinnedRow) {
+                    socket.emit('msg_pinned', { id: pinnedRow.id, text: pinnedRow.text, chatId: chatWith });
+                }
             }
         } else {
             historyRows = await db.all(`SELECT * FROM messages WHERE (fromUser = ? AND toUser = ?) OR (fromUser = ? AND toUser = ?) ORDER BY id DESC LIMIT 40 OFFSET ?`, 
@@ -590,7 +649,11 @@ io.on('connection', (socket) => {
             if (deletedFor.includes(currentUsername)) return null; 
 
             let fromDisplayName = r.fromUser;
-            let emojiStatus = users[r.fromUser] ? (users[r.fromUser].emojiStatus || '') : '';
+            let emojiStatus = '';
+            
+            if (users[r.fromUser]) {
+                emojiStatus = users[r.fromUser].emojiStatus || '';
+            }
 
             if (r.fromUser !== currentUsername && groups[chatWith]) {
                 const contactObj = myUser.contacts ? myUser.contacts.find(c => (typeof c === 'object' ? c.username : c) === r.fromUser) : null;
@@ -636,7 +699,13 @@ io.on('connection', (socket) => {
         historyRows.reverse();
         
         let history = historyRows.map(r => ({
-            id: r.id, from: r.fromUser, to: r.toUser, text: r.text, time: r.time, read: r.isRead === 1, isEdited: r.isEdited === 1
+            id: r.id, 
+            from: r.fromUser, 
+            to: r.toUser, 
+            text: r.text, 
+            time: r.time, 
+            read: r.isRead === 1, 
+            isEdited: r.isEdited === 1
         }));
         
         socket.emit('chat_history', { history, offset: 0, chatWith: data.chatWith, isSearch: true });
@@ -661,10 +730,24 @@ io.on('connection', (socket) => {
             media: data.media || null,
             reply: data.reply || null,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            read: false, reactions: {}, isEdited: false, deletedFor: []
+            read: false, 
+            reactions: {}, 
+            isEdited: false, 
+            deletedFor: []
         };
 
-        await db.run(`INSERT INTO messages (id, fromUser, toUser, text, mediaType, mediaData, mediaName, replyData, time, isRead, isEdited, isPinned, reactions, deletedFor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '{}', '[]')`, [msg.id, msg.from, msg.to, msg.text, msg.media ? msg.media.type : null, msg.media ? msg.media.data : null, msg.media ? msg.media.name : null, msg.reply ? JSON.stringify(msg.reply) : null, msg.time]);
+        await db.run(`INSERT INTO messages 
+            (id, fromUser, toUser, text, mediaType, mediaData, mediaName, replyData, time, isRead, isEdited, isPinned, reactions, deletedFor) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '{}', '[]')`,
+            [
+                msg.id, msg.from, msg.to, msg.text,
+                msg.media ? msg.media.type : null,
+                msg.media ? msg.media.data : null,
+                msg.media ? msg.media.name : null,
+                msg.reply ? JSON.stringify(msg.reply) : null,
+                msg.time
+            ]
+        );
 
         const users = readData(USERS_FILE);
         const groups = readData(GROUPS_FILE);
@@ -718,13 +801,16 @@ io.on('connection', (socket) => {
     socket.on('mark_read', async (data) => {
         if (!currentUsername) return;
         const groups = readData(GROUPS_FILE);
+        
         if (groups[data.chatWith]) {
             await db.run(`UPDATE messages SET isRead = 1 WHERE toUser = ? AND fromUser != ? AND isRead = 0`, [data.chatWith, currentUsername]);
         } else {
             const rows = await db.all(`SELECT fromUser FROM messages WHERE fromUser = ? AND toUser = ? AND isRead = 0`, [data.chatWith, currentUsername]);
             if (rows.length > 0) {
                 await db.run(`UPDATE messages SET isRead = 1 WHERE fromUser = ? AND toUser = ?`, [data.chatWith, currentUsername]);
-                if (onlineUsers[data.chatWith]) io.to(onlineUsers[data.chatWith]).emit('messages_read', { by: currentUsername });
+                if (onlineUsers[data.chatWith]) {
+                    io.to(onlineUsers[data.chatWith]).emit('messages_read', { by: currentUsername });
+                }
             }
         }
     });
@@ -733,7 +819,9 @@ io.on('connection', (socket) => {
         const groups = readData(GROUPS_FILE);
         if (groups[data.to]) {
             groups[data.to].members.forEach(member => {
-                if (member !== currentUsername && onlineUsers[member]) io.to(onlineUsers[member]).emit('user_typing', { from: currentUsername, to: data.to });
+                if (member !== currentUsername && onlineUsers[member]) {
+                    io.to(onlineUsers[member]).emit('user_typing', { from: currentUsername, to: data.to });
+                }
             });
         } else if (onlineUsers[data.to]) {
             io.to(onlineUsers[data.to]).emit('user_typing', { from: currentUsername, to: currentUsername });
@@ -744,18 +832,20 @@ io.on('connection', (socket) => {
         const groups = readData(GROUPS_FILE);
         if (groups[data.to]) {
             groups[data.to].members.forEach(member => {
-                if (member !== currentUsername && onlineUsers[member]) io.to(onlineUsers[member]).emit('user_stop_typing', { from: currentUsername, to: data.to });
+                if (member !== currentUsername && onlineUsers[member]) {
+                    io.to(onlineUsers[member]).emit('user_stop_typing', { from: currentUsername, to: data.to });
+                }
             });
         } else if (onlineUsers[data.to]) {
             io.to(onlineUsers[data.to]).emit('user_stop_typing', { from: currentUsername, to: currentUsername });
         }
     });
 
-    // --- ЛОГИКА ИСТОРИЙ ---
+    // --- ЛОГИКА ИСТОРИЙ (STORIES) С ПРОСМОТРАМИ И РЕАКЦИЯМИ ---
     socket.on('upload_story', async (data) => {
         if (!currentUsername) return;
         const id = Date.now().toString();
-        const expiresAt = Date.now() + 24 * 60 * 60 * 1000; 
+        const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 часа
         
         let finalMediaData = null;
         if (data.mediaData.startsWith('data:')) {
@@ -766,30 +856,77 @@ io.on('connection', (socket) => {
             [id, currentUsername, finalMediaData || data.mediaData, data.mediaType, Date.now(), expiresAt, '[]', '{}']);
         
         const users = readData(USERS_FILE);
-        
-        io.emit('new_story', { 
-            id: id, username: currentUsername, media: finalMediaData || data.mediaData, type: data.mediaType,
+        const storyObj = { 
+            id: id, 
+            username: currentUsername, 
+            media: finalMediaData || data.mediaData, 
+            type: data.mediaType,
             userAvatar: users[currentUsername] ? users[currentUsername].avatar : null,
             profileColor: users[currentUsername] ? users[currentUsername].profileColor : 'var(--primary)',
-            views: [], reactions: {}
-        });
+            views: [],
+            reactions: {}
+        };
+
+        // Отправляем автору
+        socket.emit('new_story', storyObj);
+
+        // Рассылаем ТОЛЬКО контактам и тем, с кем есть чат
+        for (let otherUser in onlineUsers) {
+            if (otherUser === currentUsername) continue;
+            
+            const otherU = users[otherUser];
+            let canSee = false;
+            
+            if (otherU && otherU.contacts && otherU.contacts.some(c => (typeof c === 'object' ? c.username : c) === currentUsername)) {
+                canSee = true;
+            } else {
+                const hasChat = await db.get(`SELECT id FROM messages WHERE (fromUser=? AND toUser=?) OR (fromUser=? AND toUser=?) LIMIT 1`, [currentUsername, otherUser, otherUser, currentUsername]);
+                if (hasChat) canSee = true;
+            }
+            
+            if (canSee) {
+                io.to(onlineUsers[otherUser]).emit('new_story', storyObj);
+            }
+        }
     });
 
     socket.on('get_stories', async () => {
         if (!currentUsername) return;
+        
+        // Удаляем старые истории
         await db.run('DELETE FROM stories WHERE expiresAt < ?', [Date.now()]);
         
-        const stories = await db.all('SELECT * FROM stories ORDER BY createdAt ASC');
         const users = readData(USERS_FILE);
+        const myUser = users[currentUsername];
         
-        const enrichedStories = stories.map(s => ({
-            ...s,
-            views: s.views ? JSON.parse(s.views) : [],
-            reactions: s.reactions ? JSON.parse(s.reactions) : {},
-            userAvatar: users[s.username] ? users[s.username].avatar : null,
-            emojiStatus: users[s.username] ? users[s.username].emojiStatus : '',
-            profileColor: users[s.username] ? users[s.username].profileColor : 'var(--primary)'
-        }));
+        // Список тех, чьи истории мы можем видеть
+        let allowedAuthors = new Set();
+        allowedAuthors.add(currentUsername); 
+        
+        if (myUser && myUser.contacts) {
+            myUser.contacts.forEach(c => allowedAuthors.add(typeof c === 'object' ? c.username : c));
+        }
+        
+        const chatRows = await db.all(`SELECT fromUser, toUser FROM messages WHERE fromUser = ? OR toUser = ?`, [currentUsername, currentUsername]);
+        chatRows.forEach(r => {
+            if (r.fromUser !== currentUsername) allowedAuthors.add(r.fromUser);
+            if (r.toUser !== currentUsername) allowedAuthors.add(r.toUser);
+        });
+
+        const stories = await db.all('SELECT * FROM stories ORDER BY createdAt ASC');
+        
+        const enrichedStories = stories
+            .filter(s => allowedAuthors.has(s.username))
+            .map(s => ({
+                ...s,
+                media: s.mediaData, 
+                type: s.mediaType, 
+                views: s.views ? JSON.parse(s.views) : [],
+                reactions: s.reactions ? JSON.parse(s.reactions) : {},
+                userAvatar: users[s.username] ? users[s.username].avatar : null,
+                emojiStatus: users[s.username] ? users[s.username].emojiStatus : '',
+                profileColor: users[s.username] ? users[s.username].profileColor : 'var(--primary)'
+            }));
         
         socket.emit('stories_data', enrichedStories);
     });
@@ -802,6 +939,7 @@ io.on('connection', (socket) => {
             if (!views.includes(currentUsername)) {
                 views.push(currentUsername);
                 await db.run('UPDATE stories SET views = ? WHERE id = ?', [JSON.stringify(views), data.id]);
+                // Оповещаем автора, если он онлайн
                 if (onlineUsers[story.username]) {
                     io.to(onlineUsers[story.username]).emit('story_viewed', { id: data.id, viewer: currentUsername });
                 }
@@ -816,6 +954,8 @@ io.on('connection', (socket) => {
             let reactions = JSON.parse(story.reactions || '{}');
             reactions[currentUsername] = data.emoji;
             await db.run('UPDATE stories SET reactions = ? WHERE id = ?', [JSON.stringify(reactions), data.id]);
+            
+            // Если автор онлайн, отправляем ему реакцию
             if (onlineUsers[story.username]) {
                 io.to(onlineUsers[story.username]).emit('story_reaction_received', { id: data.id, from: currentUsername, emoji: data.emoji });
             }
@@ -831,10 +971,14 @@ io.on('connection', (socket) => {
     socket.on('toggle_contact', (data) => {
         if (!currentUsername) return;
         const users = readData(USERS_FILE);
-        if (!users[currentUsername].contacts) users[currentUsername].contacts = [];
+        if (!users[currentUsername].contacts) {
+            users[currentUsername].contacts = [];
+        }
         let contacts = users[currentUsername].contacts.filter(c => (typeof c === 'object' ? c.username : c) !== data.username);
         
-        if (!data.remove) contacts.push({ username: data.username, customName: data.customName || data.username });
+        if (!data.remove) {
+            contacts.push({ username: data.username, customName: data.customName || data.username });
+        }
         users[currentUsername].contacts = contacts;
         writeData(USERS_FILE, users);
         socket.emit('contact_toggled', { username: data.username, inContacts: !data.remove });
@@ -843,18 +987,28 @@ io.on('connection', (socket) => {
     socket.on('toggle_block', (data) => {
         if (!currentUsername) return;
         const users = readData(USERS_FILE);
-        if (!users[currentUsername].blocked) users[currentUsername].blocked = [];
+        if (!users[currentUsername].blocked) {
+            users[currentUsername].blocked = [];
+        }
         const idx = users[currentUsername].blocked.indexOf(data.username);
         let isBlocked = false;
         
-        if (idx === -1) { users[currentUsername].blocked.push(data.username); isBlocked = true; } 
-        else { users[currentUsername].blocked.splice(idx, 1); }
+        if (idx === -1) { 
+            users[currentUsername].blocked.push(data.username); 
+            isBlocked = true; 
+        } else { 
+            users[currentUsername].blocked.splice(idx, 1); 
+        }
         
         writeData(USERS_FILE, users);
         socket.emit('block_toggled', { username: data.username, isBlocked });
-        if (onlineUsers[data.username]) io.to(onlineUsers[data.username]).emit('user_status_change', { username: currentUsername, online: !isBlocked, lastSeen: isBlocked ? 'blocked' : 'online' });
+        
+        if (onlineUsers[data.username]) {
+            io.to(onlineUsers[data.username]).emit('user_status_change', { username: currentUsername, online: !isBlocked, lastSeen: isBlocked ? 'blocked' : 'online' });
+        }
     });
 
+    // --- ОБНОВЛЕНИЕ ГРУПП (Для кастомизации) ---
     socket.on('update_group_info', (data) => {
         if (!currentUsername) return;
         const groups = readData(GROUPS_FILE);
@@ -884,9 +1038,12 @@ io.on('connection', (socket) => {
         data.members.forEach(memberId => {
             if (memberId === currentUsername) return;
             const u = users[memberId];
+            
             if (u && u.privacy && u.privacy.groups === 'contacts') {
                 const amIContact = u.contacts && u.contacts.some(c => (typeof c === 'object' ? c.username : c) === currentUsername);
-                if (amIContact) allowedMembers.push(memberId);
+                if (amIContact) {
+                    allowedMembers.push(memberId);
+                }
             } else { 
                 allowedMembers.push(memberId); 
             }
@@ -894,9 +1051,15 @@ io.on('connection', (socket) => {
 
         let members = [...new Set(allowedMembers)].slice(0, 100);
         groups[data.id] = { 
-            id: data.id, name: data.name, description: data.description || '', avatar: data.avatar || null, 
-            profileBg: data.profileBg || null, profileColor: data.profileColor || 'var(--primary)', emojiStatus: data.emojiStatus || '',
-            creator: currentUsername, members: members 
+            id: data.id, 
+            name: data.name, 
+            description: data.description || '', 
+            avatar: data.avatar || null, 
+            profileBg: data.profileBg || null,
+            profileColor: data.profileColor || 'var(--primary)',
+            emojiStatus: data.emojiStatus || '',
+            creator: currentUsername, 
+            members: members 
         };
         
         writeData(GROUPS_FILE, groups);
@@ -914,7 +1077,9 @@ io.on('connection', (socket) => {
         const groups = readData(GROUPS_FILE);
         if (groups[data.groupId]) {
             groups[data.groupId].members = groups[data.groupId].members.filter(m => m !== currentUsername);
-            if (groups[data.groupId].members.length === 0) delete groups[data.groupId];
+            if (groups[data.groupId].members.length === 0) {
+                delete groups[data.groupId];
+            }
             writeData(GROUPS_FILE, groups);
             socket.emit('get_my_chats');
         }
@@ -946,13 +1111,20 @@ io.on('connection', (socket) => {
         
         if (msg) {
             const recipient = msg.toUser === currentUsername ? msg.fromUser : msg.toUser;
+            
             if (data.forEveryone && msg.fromUser === currentUsername) {
                 await db.run(`DELETE FROM messages WHERE id = ?`, [data.id]);
                 if (groups[recipient]) { 
-                    groups[recipient].members.forEach(member => { if (onlineUsers[member]) io.to(onlineUsers[member]).emit('msg_deleted', { id: data.id }); }); 
+                    groups[recipient].members.forEach(member => { 
+                        if (onlineUsers[member]) {
+                            io.to(onlineUsers[member]).emit('msg_deleted', { id: data.id }); 
+                        }
+                    }); 
                 } else { 
                     socket.emit('msg_deleted', { id: data.id }); 
-                    if (onlineUsers[recipient]) io.to(onlineUsers[recipient]).emit('msg_deleted', { id: data.id }); 
+                    if (onlineUsers[recipient]) {
+                        io.to(onlineUsers[recipient]).emit('msg_deleted', { id: data.id }); 
+                    }
                 }
             } else {
                 let deletedFor = msg.deletedFor ? JSON.parse(msg.deletedFor) : [];
@@ -980,26 +1152,42 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         if (currentUsername) {
-            const users = readData(USERS_FILE); const now = Date.now(); let u = users[currentUsername];
-            if (u) { u.lastSeen = now; writeData(USERS_FILE, users); }
+            const users = readData(USERS_FILE); 
+            const now = Date.now();
+            let u = users[currentUsername];
+            
+            if (u) { 
+                u.lastSeen = now; 
+                writeData(USERS_FILE, users); 
+            }
+            
             delete onlineUsers[currentUsername];
+
             for (let otherUser in onlineUsers) {
                 let canSee = true;
                 if (u && u.privacy) {
-                    if (u.privacy.online === 'nobody') canSee = false;
-                    else if (u.privacy.online === 'contacts') {
+                    if (u.privacy.online === 'nobody') {
+                        canSee = false;
+                    } else if (u.privacy.online === 'contacts') {
                         const isContactForThem = u.contacts && u.contacts.some(c => (typeof c === 'object' ? c.username : c) === otherUser);
-                        if (!isContactForThem) canSee = false;
+                        if (!isContactForThem) {
+                            canSee = false;
+                        }
                     }
                 }
-                if (canSee) io.to(onlineUsers[otherUser]).emit('user_status_change', { username: currentUsername, online: false, lastSeen: now });
+                if (canSee) {
+                    io.to(onlineUsers[otherUser]).emit('user_status_change', { username: currentUsername, online: false, lastSeen: now });
+                }
             }
         }
     });
 });
 
 const PORT = process.env.PORT || 3000;
-const peerServer = ExpressPeerServer(server, { debug: true, path: '/' });
+const peerServer = ExpressPeerServer(server, { 
+    debug: true, 
+    path: '/' 
+});
 app.use('/peerjs', peerServer);
 
 server.listen(PORT, '0.0.0.0', () => {
