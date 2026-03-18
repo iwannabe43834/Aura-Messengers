@@ -2,7 +2,6 @@
 <html lang="ru">
 <head>
     <script>
-        // Проверка, залогинен ли юзер
         if (!localStorage.getItem('username')) {
             window.location.href = 'auth.html'; 
         }
@@ -55,6 +54,46 @@
         .admin-edit-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1rem; padding: 5px; margin-left: 10px; }
         .danger-btn-small { background: var(--bg-hover); color: #ff3b30; border: 1px solid rgba(255,59,48,0.3); border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; cursor: pointer; }
         .danger-btn-small:hover { background: rgba(255,59,48,0.1); }
+
+        /* --- ФИКС ПРОКРУТКИ НАСТРОЕК НА МОБИЛКЕ --- */
+        .drawer-content {
+            overflow-y: auto !important;
+            height: calc(100vh - 60px) !important; 
+            padding-bottom: 120px !important; 
+            -webkit-overflow-scrolling: touch; 
+        }
+        .drawer-content::-webkit-scrollbar { display: none; }
+
+        /* --- ТЕЛЕГРАМ-НАВИГАЦИЯ ДЛЯ МОБИЛОК --- */
+        .mobile-bottom-nav { display: none; }
+
+        @media (max-width: 768px) {
+            .mobile-bottom-nav {
+                display: flex;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                background: var(--bg-secondary);
+                border-top: 1px solid var(--border);
+                z-index: 2000;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            .mobile-bottom-nav .nav-item {
+                flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                padding: 10px 0 8px 0; background: none; border: none; color: var(--text-dim);
+                font-size: 0.65rem; font-weight: 500; cursor: pointer; transition: color 0.2s; position: relative;
+            }
+            .mobile-bottom-nav .nav-item i { font-size: 1.4rem; margin-bottom: 5px; }
+            .mobile-bottom-nav .nav-item.active { color: var(--primary); }
+            .mobile-bottom-nav .nav-badge {
+                position: absolute; top: 4px; right: calc(50% - 22px); background: #ff3b30; color: white;
+                font-size: 0.6rem; padding: 2px 5px; border-radius: 10px; font-weight: bold; display: none;
+            }
+            .chat-open .mobile-bottom-nav { display: none; }
+            .sidebar { padding-bottom: 70px; }
+            .header-top .menu-btn:first-child { display: none; }
+        }
     </style>
 </head>
 <body class="pattern-none" id="app-body" data-theme="dark" data-lang="ru">
@@ -391,6 +430,26 @@
         </div>
     </aside>
 
+    <nav class="mobile-bottom-nav">
+        <button class="nav-item" onclick="switchMobileTab('contacts', this)">
+            <i class="fas fa-user-circle"></i>
+            <span>Контакты</span>
+        </button>
+        <button class="nav-item" onclick="switchMobileTab('calls', this)">
+            <i class="fas fa-phone-alt"></i>
+            <span>Звонки</span>
+        </button>
+        <button class="nav-item active" onclick="switchMobileTab('chats', this)">
+            <i class="fas fa-comments"></i>
+            <span>Чаты</span>
+            <div class="nav-badge" id="total-unread-badge"></div>
+        </button>
+        <button class="nav-item" onclick="switchMobileTab('settings', this)">
+            <i class="fas fa-cog"></i>
+            <span>Настройки</span>
+        </button>
+    </nav>
+
     <main class="chat-area">
         <div id="welcome-screen" class="welcome-screen">
             <div class="welcome-content">
@@ -423,7 +482,6 @@
                     <button id="header-screen-btn" style="background:none; border:none; color:var(--primary); font-size:1.2rem; cursor:pointer; margin-right: 5px;" onclick="startScreenShare()" title="Демонстрация экрана">
                         <i class="fas fa-desktop"></i>
                     </button>
-                    
                     <button style="background:none; border:none; color:var(--text-dim); font-size:1.2rem; cursor:pointer;" onclick="toggleChatSearch()">
                         <i class="fas fa-search"></i>
                     </button>
@@ -493,7 +551,6 @@
     let currentGroupAvatarBase64 = null;
     let editModeGroupId = null; 
 
-    // Переменные для пагинации и редактирования
     let currentOffset = 0;
     let isLoadingHistory = false;
     let hasMoreHistory = true;
@@ -514,19 +571,17 @@
     const chatStatusEl = document.getElementById('chat-status');
     const contextMenuEl = document.getElementById('msg-context-menu');
 
-    // --- ЛОГИКА WEBRTC И PEERJS ДЛЯ ЗВОНКОВ (ПОЛНОСТЬЮ ОБНОВЛЕННАЯ) ---
+    // --- ЛОГИКА WEBRTC И PEERJS ДЛЯ ЗВОНКОВ ---
     let peer = null;
     let currentCall = null;
     let localStream = null;
     let isVideoCall = false;
     let isRemoteMuted = false;
     
-    // Переменные для истории звонков и таймера
     let callStartTime = null;
     let callTimerInterval = null;
     let callInitiator = false;
 
-    // Форматирование миллисекунд в ММ:СС
     function formatCallDuration(ms) {
         if (!ms || ms < 0) return "00:00";
         const totalSec = Math.floor(ms / 1000);
@@ -544,7 +599,7 @@
 
         peer.on('call', (incomingCall) => {
             currentCall = incomingCall;
-            callInitiator = false; // Мы принимаем звонок, поэтому инициатор - false
+            callInitiator = false; 
             isVideoCall = incomingCall.metadata ? incomingCall.metadata.isVideo : true;
             
             document.getElementById('call-overlay').classList.remove('hidden');
@@ -558,7 +613,6 @@
             document.getElementById('call-name').textContent = incomingCall.peer;
             document.getElementById('call-status-text').textContent = isVideoCall ? 'Входящий видеозвонок...' : 'Входящий аудиозвонок...';
             
-            // Подтягиваем аватарку для окна звонка
             fetch(`/api/entity/${incomingCall.peer}`).then(r => r.json()).then(d => {
                 const av = document.getElementById('call-avatar');
                 if (d.avatar) { 
@@ -575,7 +629,7 @@
     async function makeCall(video) {
         if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) return showToast("Звонки доступны только один на один");
         isVideoCall = video;
-        callInitiator = true; // Мы инициатор, поэтому запишем историю
+        callInitiator = true; 
         
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ video: isVideoCall, audio: true });
@@ -692,28 +746,19 @@
     }
 
     function closeCallUI() {
-        // Останавливаем таймер
         clearInterval(callTimerInterval);
-        
-        // Считаем длительность
         let durationStr = "00:00";
-        if (callStartTime) {
-            durationStr = formatCallDuration(Date.now() - callStartTime);
-        }
+        if (callStartTime) { durationStr = formatCallDuration(Date.now() - callStartTime); }
 
-        // Прячем всё
         document.getElementById('call-overlay').classList.add('hidden');
         document.getElementById('incoming-call-actions').classList.add('hidden');
         document.getElementById('active-call-actions').classList.add('hidden');
         
         if (localStream) localStream.getTracks().forEach(track => track.stop());
         
-        // Отправляем системное сообщение в чат, если мы были инициатором звонка
         if (callInitiator && selectedChatId && currentCall) {
             let textMsg = `📞 Звонок отменен / пропущен`;
-            if (callStartTime) {
-                textMsg = `📞 Звонок завершен. Длительность: ${durationStr}`;
-            }
+            if (callStartTime) { textMsg = `📞 Звонок завершен. Длительность: ${durationStr}`; }
             socket.emit('private_msg', { to: selectedChatId, text: textMsg });
         }
 
@@ -750,7 +795,6 @@
         }
     }
 
-    // НОВАЯ ФУНКЦИЯ: Замутить собеседника
     function toggleRemoteAudio() {
         const remoteVid = document.getElementById('remote-video');
         isRemoteMuted = !isRemoteMuted;
@@ -761,7 +805,25 @@
         btn.style.background = isRemoteMuted ? '#ff3b30' : 'rgba(255,255,255,0.2)';
     }
 
+    // --- ЛОГИКА НИЖНЕЙ ПАНЕЛИ НАВИГАЦИИ (ДЛЯ МОБИЛОК) ---
+    function switchMobileTab(tab, btnElement) {
+        document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(btn => btn.classList.remove('active'));
+        btnElement.classList.add('active');
 
+        if (tab === 'settings') {
+            toggleSettings(true);
+        } else if (tab === 'chats') {
+            toggleSettings(false);
+        } else if (tab === 'contacts') {
+            toggleSettings(false);
+            showToast("Вкладка Контакты в разработке!");
+        } else if (tab === 'calls') {
+            toggleSettings(false);
+            showToast("История звонков в разработке!");
+        }
+    }
+
+    // --- ОСНОВНАЯ ЛОГИКА ЧАТА ---
     const dict = {
         ru: { 
             writeMsg: "Написать", addContact: "В контакты", removeContact: "Из контактов", blockUser: "Заблокировать", unblockUser: "Разблокировать", 
