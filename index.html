@@ -14,7 +14,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=10">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script src="/socket.io/socket.io.js"></script>
@@ -38,7 +38,9 @@
             padding: 5px 10px;
             transition: color 0.2s;
         }
-        .header-menu-btn:hover { color: var(--primary); }
+        .header-menu-btn:hover {
+            color: var(--primary);
+        }
     </style>
 </head>
 <body class="pattern-none" id="app-body" data-theme="dark" data-lang="ru">
@@ -347,7 +349,7 @@
 
                     <div class="settings-input-group">
                         <label>ЦВЕТ ПРОФИЛЯ</label>
-                        <input type="color" id="edit-profile-color" value="#8774e1" style="height: 45px; padding: 5px; width: 100%; border-radius: 12px;">
+                        <input type="color" id="edit-profile-color" style="height: 45px; padding: 5px; width: 100%; border-radius: 12px;">
                     </div>
                     <div class="settings-input-group">
                         <label>ЭМОДЗИ-СТАТУС</label>
@@ -379,8 +381,6 @@
                             <option value="ocean">Океан</option>
                             <option value="sunset">Закат</option>
                             <option value="neon">Неон</option>
-                            <option value="forest">Лес (Forest)</option>
-                            <option value="cyberpunk">Киберпанк</option>
                         </select>
                     </div>
                     <div class="settings-input-group">
@@ -592,24 +592,38 @@
     const contextMenuEl = document.getElementById('msg-context-menu');
 
     function logoutApp() {
-        localStorage.removeItem('username'); 
+        localStorage.removeItem('username');
         window.location.href = '/logout';
     }
 
-    // --- ЗВОНКИ ---
-    let peer = null, currentCall = null, localStream = null, isVideoCall = false, isRemoteMuted = false, callStartTime = null, callTimerInterval = null, callInitiator = false;
+    let peer = null;
+    let currentCall = null;
+    let localStream = null;
+    let isVideoCall = false;
+    let isRemoteMuted = false;
+    let callStartTime = null;
+    let callTimerInterval = null;
+    let callInitiator = false;
 
     function formatCallDuration(ms) {
         if (!ms || ms < 0) return "00:00";
         const totalSec = Math.floor(ms / 1000);
-        const m = Math.floor(totalSec / 60); const s = totalSec % 60;
+        const m = Math.floor(totalSec / 60); 
+        const s = totalSec % 60;
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
 
     function initPeerJS() {
-        peer = new Peer(currentUser.username, { host: window.location.hostname, port: window.location.port || (window.location.protocol === 'https:' ? 443 : 80), path: '/peerjs' });
+        peer = new Peer(currentUser.username, { 
+            host: window.location.hostname, 
+            port: window.location.port || (window.location.protocol === 'https:' ? 443 : 80), 
+            path: '/peerjs' 
+        });
         peer.on('call', (incomingCall) => {
-            currentCall = incomingCall; callInitiator = false; isVideoCall = incomingCall.metadata ? incomingCall.metadata.isVideo : true;
+            currentCall = incomingCall; 
+            callInitiator = false; 
+            isVideoCall = incomingCall.metadata ? incomingCall.metadata.isVideo : true;
+            
             document.getElementById('call-overlay').classList.remove('hidden');
             document.getElementById('call-ui-content').classList.remove('hidden');
             document.getElementById('incoming-call-actions').classList.remove('hidden');
@@ -618,23 +632,35 @@
             document.getElementById('video-container').classList.add('hidden');
             document.getElementById('call-name').textContent = incomingCall.peer;
             document.getElementById('call-status-text').textContent = isVideoCall ? 'Входящий видеозвонок...' : 'Входящий аудиозвонок...';
+            
             fetch(`/api/entity/${incomingCall.peer}`).then(r => r.json()).then(d => {
                 const av = document.getElementById('call-avatar');
-                if (d.avatar) { av.style.backgroundImage = `url(${d.avatar})`; av.textContent = ''; } 
-                else { av.style.backgroundImage = 'none'; av.style.background = d.profileColor || 'var(--primary)'; av.textContent = (d.displayName || incomingCall.peer)[0].toUpperCase(); }
+                if (d.avatar) { 
+                    av.style.backgroundImage = `url(${d.avatar})`; 
+                    av.textContent = ''; 
+                } else { 
+                    av.style.backgroundImage = 'none'; 
+                    av.style.background = d.profileColor || 'var(--primary)'; 
+                    av.textContent = (d.displayName || incomingCall.peer)[0].toUpperCase(); 
+                }
             }).catch(()=>{});
         });
     }
 
     async function makeCall(video) {
-        if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) return showToast("Звонки доступны только один на один");
+        if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) {
+            return showToast("Звонки доступны только один на один");
+        }
         document.getElementById('chat-header-dropdown').classList.add('hidden');
-        isVideoCall = video; callInitiator = true; 
+        isVideoCall = video; 
+        callInitiator = true; 
+        
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ video: isVideoCall, audio: true });
             document.getElementById('local-video').srcObject = localStream;
             currentCall = peer.call(selectedChatId, localStream, { metadata: { isVideo: isVideoCall } });
             showCallActiveUI(selectedChatId, "Звоним...");
+            
             currentCall.on('stream', remoteStream => {
                 callStartTime = Date.now();
                 callTimerInterval = setInterval(() => {
@@ -644,21 +670,29 @@
                 document.getElementById('remote-video').srcObject = remoteStream;
             });
             currentCall.on('close', closeCallUI);
-        } catch(err) { showToast("Нет доступа к микрофону/камере"); }
+        } catch(err) { 
+            showToast("Нет доступа к микрофону/камере"); 
+        }
     }
 
     async function startScreenShare() {
-        if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) return showToast("Демонстрация доступна только в личных чатах");
+        if (!selectedChatId || selectedChatId === 'me' || isCurrentChatGroup) {
+            return showToast("Демонстрация доступна только в личных чатах");
+        }
         document.getElementById('chat-header-dropdown').classList.add('hidden');
-        isVideoCall = true; callInitiator = true;
+        isVideoCall = true; 
+        callInitiator = true;
+        
         try {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
             const voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             const combinedTracks = [...screenStream.getVideoTracks(), ...voiceStream.getAudioTracks()];
             localStream = new MediaStream(combinedTracks);
+            
             document.getElementById('local-video').srcObject = localStream;
             currentCall = peer.call(selectedChatId, localStream, { metadata: { isVideo: true } });
             showCallActiveUI(selectedChatId, "Демонстрация экрана...");
+            
             currentCall.on('stream', remoteStream => {
                 callStartTime = Date.now();
                 callTimerInterval = setInterval(() => {
@@ -668,8 +702,13 @@
                 document.getElementById('remote-video').srcObject = remoteStream;
             });
             currentCall.on('close', closeCallUI);
-            screenStream.getVideoTracks()[0].onended = () => { endCall(); showToast("Демонстрация завершена"); };
-        } catch(err) { showToast("Доступ к экрану отменен"); }
+            screenStream.getVideoTracks()[0].onended = () => { 
+                endCall(); 
+                showToast("Демонстрация завершена"); 
+            };
+        } catch(err) { 
+            showToast("Доступ к экрану отменен"); 
+        }
     }
 
     async function acceptCall() {
@@ -678,6 +717,7 @@
             document.getElementById('local-video').srcObject = localStream;
             currentCall.answer(localStream);
             showCallActiveUI(currentCall.peer, "Соединение установлено");
+            
             currentCall.on('stream', remoteStream => {
                 callStartTime = Date.now();
                 callTimerInterval = setInterval(() => {
@@ -687,11 +727,21 @@
                 document.getElementById('remote-video').srcObject = remoteStream;
             });
             currentCall.on('close', closeCallUI);
-        } catch(err) { showToast("Нет доступа к микрофону/камере"); rejectCall(); }
+        } catch(err) { 
+            showToast("Нет доступа к микрофону/камере"); 
+            rejectCall(); 
+        }
     }
 
-    function rejectCall() { if (currentCall) currentCall.close(); closeCallUI(); }
-    function endCall() { if (currentCall) currentCall.close(); closeCallUI(); }
+    function rejectCall() { 
+        if (currentCall) currentCall.close(); 
+        closeCallUI(); 
+    }
+    
+    function endCall() { 
+        if (currentCall) currentCall.close(); 
+        closeCallUI(); 
+    }
 
     function showCallActiveUI(name, status) {
         document.getElementById('call-overlay').classList.remove('hidden');
@@ -701,25 +751,44 @@
         document.getElementById('active-call-actions').classList.remove('hidden');
         document.getElementById('call-name').textContent = name;
         document.getElementById('call-status-text').textContent = status;
-        if (isVideoCall) document.getElementById('video-container').classList.remove('hidden');
-        else document.getElementById('video-container').classList.add('hidden');
+        
+        if (isVideoCall) {
+            document.getElementById('video-container').classList.remove('hidden');
+        } else {
+            document.getElementById('video-container').classList.add('hidden');
+        }
     }
 
     function closeCallUI() {
         clearInterval(callTimerInterval);
-        let durationStr = "00:00"; if (callStartTime) durationStr = formatCallDuration(Date.now() - callStartTime);
+        let durationStr = "00:00"; 
+        
+        if (callStartTime) {
+            durationStr = formatCallDuration(Date.now() - callStartTime);
+        }
+        
         document.getElementById('call-overlay').classList.add('hidden');
         document.getElementById('incoming-call-actions').classList.add('hidden');
         document.getElementById('active-call-actions').classList.add('hidden');
-        if (localStream) localStream.getTracks().forEach(track => track.stop());
+        
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
         
         if (callInitiator && selectedChatId && currentCall) {
             let textMsg = `<span class="system-call-msg"><i class="fas fa-phone-slash"></i> Звонок отменен / пропущен</span>`;
-            if (callStartTime) textMsg = `<span class="system-call-msg"><i class="fas fa-phone-alt"></i> Звонок завершен.<br><span>Длительность: ${durationStr}</span></span>`; 
+            if (callStartTime) {
+                textMsg = `<span class="system-call-msg"><i class="fas fa-phone-alt"></i> Звонок завершен.<br><span>Длительность: ${durationStr}</span></span>`; 
+            }
             socket.emit('private_msg', { to: selectedChatId, text: textMsg });
         }
-        currentCall = null; localStream = null; callStartTime = null; callInitiator = false;
-        document.getElementById('local-video').srcObject = null; document.getElementById('remote-video').srcObject = null;
+        
+        currentCall = null; 
+        localStream = null; 
+        callStartTime = null; 
+        callInitiator = false;
+        document.getElementById('local-video').srcObject = null; 
+        document.getElementById('remote-video').srcObject = null;
     }
 
     function toggleAudio() {
@@ -748,13 +817,13 @@
 
     function toggleRemoteAudio() {
         const remoteVid = document.getElementById('remote-video');
-        isRemoteMuted = !isRemoteMuted; remoteVid.muted = isRemoteMuted;
+        isRemoteMuted = !isRemoteMuted; 
+        remoteVid.muted = isRemoteMuted;
         const btn = document.getElementById('remote-audio-toggle-btn');
         btn.innerHTML = isRemoteMuted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>';
         btn.style.background = isRemoteMuted ? '#ff3b30' : 'rgba(255,255,255,0.2)';
     }
 
-    // --- ОБОИ И МЕНЮ ЧАТА ---
     function toggleChatHeaderMenu(e) {
         e.stopPropagation();
         const menu = document.getElementById('chat-header-dropdown');
@@ -800,7 +869,7 @@
         const chatArea = document.getElementById('chat-area-main');
         
         if (url) {
-            bgLayer.style.backgroundImage = `url(${url})`;
+            bgLayer.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${url})`;
             bgLayer.classList.add('active');
             chatArea.classList.add('has-wallpaper');
             document.documentElement.style.setProperty('--chat-tint', 'rgba(255,255,255,0.1)');
@@ -812,7 +881,6 @@
         }
     }
 
-    // --- ЛОГИКА ИСТОРИЙ ---
     let storiesData = [];
     let currentStoryViewerIndex = 0;
     let viewingStoriesList = [];
@@ -890,10 +958,9 @@
             grouped[s.username].push(s);
         });
 
-        const savedUser = currentUser ? currentUser.username : '';
         const sortedUsernames = Object.keys(grouped).sort((a, b) => {
-            if (a === savedUser) return -1;
-            if (b === savedUser) return 1;
+            if (a === currentUser.username) return -1;
+            if (b === currentUser.username) return 1;
             return 0;
         });
 
@@ -938,9 +1005,8 @@
         }
 
         const story = viewingStoriesList[currentStoryViewerIndex];
-        const savedUser = currentUser ? currentUser.username : '';
         
-        if (story.username !== savedUser) {
+        if (story.username !== currentUser.username) {
             socket.emit('view_story', { id: story.id });
         }
         
@@ -967,14 +1033,11 @@
         const vidEl = document.getElementById('story-viewer-vid');
         const progressFill = document.getElementById('story-progress-fill');
         
-        // ФИКС ИСТОРИЙ: Сначала прячем оба, потом загружаем и показываем
         imgEl.classList.add('hidden');
         vidEl.classList.add('hidden');
-        imgEl.src = '';
-        vidEl.src = '';
         
         const delBtn = document.getElementById('story-delete-btn');
-        if (story.username === savedUser) {
+        if (story.username === currentUser.username) {
             delBtn.classList.remove('hidden');
         } else {
             delBtn.classList.add('hidden');
@@ -985,20 +1048,21 @@
         progressFill.style.transition = 'none';
         progressFill.style.width = '0%';
         
-        if (story.type === 'video') {
-            vidEl.src = story.media;
-            vidEl.onloadeddata = () => {
+        setTimeout(() => {
+            let duration = 5000;
+            if (story.type === 'video') {
+                vidEl.src = story.media;
                 vidEl.classList.remove('hidden');
-                let duration = (vidEl.duration && vidEl.duration !== Infinity) ? vidEl.duration * 1000 : 5000;
-                startProgress(duration);
-            };
-        } else {
-            imgEl.src = story.media;
-            imgEl.onload = () => {
+                vidEl.onloadedmetadata = () => {
+                    duration = vidEl.duration * 1000;
+                    startProgress(duration);
+                };
+            } else {
+                imgEl.src = story.media;
                 imgEl.classList.remove('hidden');
-                startProgress(5000);
-            };
-        }
+                startProgress(duration);
+            }
+        }, 50);
     }
 
     function renderStoryFooter(story) {
@@ -1006,9 +1070,8 @@
         const viewsBar = document.getElementById('story-views-bar');
         const viewsCount = document.getElementById('story-views-count');
         const viewsList = document.getElementById('story-views-list');
-        const savedUser = currentUser ? currentUser.username : '';
 
-        if (story.username === savedUser) {
+        if (story.username === currentUser.username) {
             reactionsBar.classList.add('hidden');
             viewsBar.classList.remove('hidden');
             
@@ -1024,7 +1087,9 @@
                     <span>@${v}</span> ${reactEmoji}
                 </div>`;
             });
-            if(viewsArray.length === 0) listHtml = '<div style="opacity:0.5;">Нет просмотров</div>';
+            if(viewsArray.length === 0) {
+                listHtml = '<div style="opacity:0.5;">Нет просмотров</div>';
+            }
             viewsList.innerHTML = listHtml;
         } else {
             reactionsBar.classList.remove('hidden');
@@ -1075,39 +1140,81 @@
     let currentLang = 'ru';
     
     function changeLanguage(lang) { 
-        currentLang = lang; document.documentElement.setAttribute('data-lang', lang); localStorage.setItem('aura-lang', lang); 
-        document.getElementById('lang-select').value = lang; applyTranslations(); 
+        currentLang = lang; 
+        document.documentElement.setAttribute('data-lang', lang); 
+        localStorage.setItem('aura-lang', lang); 
+        applyTranslations(); 
     }
 
     function applyTranslations() { 
-        document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if (dict[currentLang][key]) el.textContent = dict[currentLang][key]; }); 
-        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const key = el.getAttribute('data-i18n-placeholder'); if (dict[currentLang][key]) el.setAttribute('placeholder', dict[currentLang][key]); }); 
-        if (selectedChatId) updateChatStatus(selectedChatId, isCurrentChatGroup); 
+        document.querySelectorAll('[data-i18n]').forEach(el => { 
+            const key = el.getAttribute('data-i18n'); 
+            if (dict[currentLang][key]) {
+                el.textContent = dict[currentLang][key]; 
+            }
+        }); 
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { 
+            const key = el.getAttribute('data-i18n-placeholder'); 
+            if (dict[currentLang][key]) {
+                el.setAttribute('placeholder', dict[currentLang][key]); 
+            }
+        }); 
+        if (selectedChatId) {
+            updateChatStatus(selectedChatId, isCurrentChatGroup); 
+        }
     }
 
     function showToast(message) { 
-        const c = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<span>${message}</span>`; c.appendChild(t); 
-        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3000); 
+        const c = document.getElementById('toast-container'); 
+        const t = document.createElement('div'); 
+        t.className = 'toast'; 
+        t.innerHTML = `<span>${message}</span>`; 
+        c.appendChild(t); 
+        
+        setTimeout(() => { 
+            t.style.opacity = '0'; 
+            setTimeout(() => t.remove(), 400); 
+        }, 3000); 
     }
 
     function formatLastSeen(timestamp) {
         if (timestamp === 'blocked') return dict[currentLang].blockedStatus; 
         if (!timestamp) return dict[currentLang].wasRecently;
-        const date = new Date(timestamp); const now = new Date(); 
+        
+        const date = new Date(timestamp); 
+        const now = new Date(); 
         const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+        
         return isToday ? `${dict[currentLang].wasToday} ${timeString}` : `${dict[currentLang].wasAt} ${date.toLocaleDateString()} ${timeString}`;
     }
 
     async function updateChatStatus(chatId, isGroup, forceOnline = null, forceLastSeen = null, membersCount = 0) {
-        if (chatId === 'me') { chatStatusEl.textContent = dict[currentLang].savedMessages; chatStatusEl.classList.remove('typing'); return; }
+        if (chatId === 'me') { 
+            chatStatusEl.textContent = dict[currentLang].savedMessages; 
+            chatStatusEl.classList.remove('typing'); 
+            return; 
+        }
+        
         chatStatusEl.classList.remove('typing');
-        if (isGroup) { chatStatusEl.textContent = `${membersCount} ${dict[currentLang].membersCount.toLowerCase()}`; return; }
-        if (forceOnline !== null) { chatStatusEl.textContent = forceOnline ? dict[currentLang].online : formatLastSeen(forceLastSeen); return; }
+        
+        if (isGroup) { 
+            chatStatusEl.textContent = `${membersCount} ${dict[currentLang].membersCount.toLowerCase()}`; 
+            return; 
+        }
+        
+        if (forceOnline !== null) { 
+            chatStatusEl.textContent = forceOnline ? dict[currentLang].online : formatLastSeen(forceLastSeen); 
+            return; 
+        }
+        
         try { 
-            const res = await fetch(`/api/entity/${chatId}`); const data = await res.json(); 
+            const res = await fetch(`/api/entity/${chatId}`); 
+            const data = await res.json(); 
             chatStatusEl.textContent = data.isBlocked ? dict[currentLang].blockedStatus : (data.isOnline ? dict[currentLang].online : formatLastSeen(data.lastSeen)); 
-        } catch (err) { chatStatusEl.textContent = ''; }
+        } catch (err) { 
+            chatStatusEl.textContent = ''; 
+        }
     }
 
     async function init() {
@@ -1124,24 +1231,13 @@
             socket.emit('get_stories'); 
             initPeerJS();
             
-            // ФИКС: Защита инпута цвета (он падает, если туда придет не HEX-код)
-            let safeColor = currentUser.profileColor || '#8774e1';
-            if (!safeColor.startsWith('#')) safeColor = '#8774e1';
-            
             document.getElementById('edit-display-name').value = currentUser.name || ''; 
             document.getElementById('edit-bio').value = currentUser.bio || ''; 
             document.getElementById('edit-location').value = currentUser.location || ''; 
             document.getElementById('edit-website').value = currentUser.website || ''; 
             document.getElementById('edit-birthday').value = currentUser.birthday || '';
-            document.getElementById('edit-profile-color').value = safeColor;
-            
-            // Проверка, есть ли такой эмодзи в списке
-            const emojiSelect = document.getElementById('edit-emoji-status');
-            if (Array.from(emojiSelect.options).some(opt => opt.value === (currentUser.emojiStatus || ''))) {
-                emojiSelect.value = currentUser.emojiStatus || '';
-            } else {
-                emojiSelect.value = '';
-            }
+            document.getElementById('edit-profile-color').value = currentUser.profileColor || '#8774e1';
+            document.getElementById('edit-emoji-status').value = currentUser.emojiStatus || '';
             
             if (currentUser.privacy) {
                 if(currentUser.privacy.calls) document.getElementById('priv-calls').value = currentUser.privacy.calls;
@@ -1156,36 +1252,61 @@
                 await Notification.requestPermission();
             }
         } catch (err) { 
-            console.error("Ошибка UI (не критично):", err);
+            console.error("Ошибка инициализации интерфейса:", err);
         }
     }
     init();
 
     function closeChatMobile() { 
-        const chatUi = document.getElementById('chat-ui'); chatUi.classList.add('chat-closing'); 
-        setTimeout(() => { mainContainer.classList.remove('chat-open'); chatUi.classList.remove('chat-closing'); }, 300); 
+        const chatUi = document.getElementById('chat-ui'); 
+        chatUi.classList.add('chat-closing'); 
+        
+        setTimeout(() => { 
+            mainContainer.classList.remove('chat-open'); 
+            chatUi.classList.remove('chat-closing'); 
+        }, 300); 
     }
 
     function updateUnreadBadge(chatId) { 
         const badge = document.getElementById(`unread-${chatId}`); 
-        if(badge) { const count = unreadCounts[chatId] || 0; if(count > 0) { badge.textContent = count; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); } } 
+        if (badge) { 
+            const count = unreadCounts[chatId] || 0; 
+            if (count > 0) { 
+                badge.textContent = count; 
+                badge.classList.remove('hidden'); 
+            } else { 
+                badge.classList.add('hidden'); 
+            } 
+        } 
     }
 
     async function openChat(chatId) {
-        selectedChatId = chatId; unreadCounts[chatId] = 0; updateUnreadBadge(chatId); 
-        currentOffset = 0; hasMoreHistory = true; document.getElementById('pinned-banner').classList.add('hidden'); messagesDiv.innerHTML = ''; document.getElementById('welcome-screen').classList.add('hidden'); document.getElementById('chat-ui').classList.remove('hidden'); mainContainer.classList.add('chat-open');
-        const headerAvatar = document.getElementById('chat-header-avatar');
+        closeContextMenu(); 
         
-        closeContextMenu(); // ФИКС: Меню исчезает при переключении чата
+        selectedChatId = chatId; 
+        unreadCounts[chatId] = 0; 
+        updateUnreadBadge(chatId); 
+        currentOffset = 0; 
+        hasMoreHistory = true; 
+        
+        document.getElementById('pinned-banner').classList.add('hidden'); 
+        messagesDiv.innerHTML = ''; 
+        document.getElementById('welcome-screen').classList.add('hidden'); 
+        document.getElementById('chat-ui').classList.remove('hidden'); 
+        mainContainer.classList.add('chat-open');
+        
+        const headerAvatar = document.getElementById('chat-header-avatar');
         applyChatWallpaper(localStorage.getItem('chatBg_' + chatId));
 
         if (chatId === 'me') {
             isCurrentChatGroup = false; 
             document.getElementById('chat-with-title').innerHTML = dict[currentLang].savedMessages; 
             document.getElementById('chat-header-info').onclick = null; 
+            
             headerAvatar.style.backgroundImage = 'none'; 
             headerAvatar.innerHTML = '<i class="fas fa-bookmark"></i>'; 
             headerAvatar.style.background = 'var(--primary)'; 
+            
             updateChatStatus('me', false); 
             inputContainer.classList.remove('hidden'); 
             readonlyBanner.classList.add('hidden'); 
@@ -1194,7 +1315,8 @@
             document.getElementById('btn-call-video').style.display = 'none'; 
             document.getElementById('btn-call-screen').style.display = 'none';
         } else {
-            const res = await fetch(`/api/entity/${chatId}`); const data = await res.json(); 
+            const res = await fetch(`/api/entity/${chatId}`); 
+            const data = await res.json(); 
             isCurrentChatGroup = (data.type === 'group' || data.type === 'channel'); 
             
             let emojiHtml = data.emojiStatus ? `<span class="emoji-status-badge">${data.emojiStatus}</span>` : '';
@@ -1203,11 +1325,26 @@
             document.getElementById('chat-header-info').onclick = () => viewUserProfile(chatId); 
             headerAvatar.innerHTML = '';
             
-            if (data.isBlocked) { headerAvatar.style.backgroundImage = 'none'; headerAvatar.style.background = 'var(--bg-hover)'; headerAvatar.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } 
-            else if (data.avatar) { headerAvatar.style.backgroundImage = `url(${data.avatar})`; headerAvatar.style.backgroundSize = 'cover'; } 
-            else { headerAvatar.style.backgroundImage = 'none'; headerAvatar.style.background = data.profileColor || 'var(--primary)'; headerAvatar.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); }
+            if (data.isBlocked) { 
+                headerAvatar.style.backgroundImage = 'none'; 
+                headerAvatar.style.background = 'var(--bg-hover)'; 
+                headerAvatar.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; 
+            } else if (data.avatar) { 
+                headerAvatar.style.backgroundImage = `url(${data.avatar})`; 
+                headerAvatar.style.backgroundSize = 'cover'; 
+            } else { 
+                headerAvatar.style.backgroundImage = 'none'; 
+                headerAvatar.style.background = data.profileColor || 'var(--primary)'; 
+                headerAvatar.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); 
+            }
 
-            if (data.type === 'channel' && !data.isCreator) { inputContainer.classList.add('hidden'); readonlyBanner.classList.remove('hidden'); } else { inputContainer.classList.remove('hidden'); readonlyBanner.classList.add('hidden'); }
+            if (data.type === 'channel' && !data.isCreator) { 
+                inputContainer.classList.add('hidden'); 
+                readonlyBanner.classList.remove('hidden'); 
+            } else { 
+                inputContainer.classList.remove('hidden'); 
+                readonlyBanner.classList.add('hidden'); 
+            }
             
             if (isCurrentChatGroup || !data.canCall) { 
                 document.getElementById('btn-call-audio').style.display = 'none'; 
@@ -1221,42 +1358,115 @@
 
             document.getElementById('chat-main-header').style.borderBottom = `2px solid ${data.profileColor || 'var(--border)'}`;
 
-            updateContactsUI(chatId); updateChatStatus(chatId, isCurrentChatGroup, data.isOnline, data.lastSeen, data.membersCount);
+            updateContactsUI(chatId); 
+            updateChatStatus(chatId, isCurrentChatGroup, data.isOnline, data.lastSeen, data.membersCount);
         }
-        socket.emit('mark_read', { chatWith: chatId }); socket.emit('get_history', { chatWith: chatId, offset: 0 }); 
+        
+        socket.emit('mark_read', { chatWith: chatId }); 
+        socket.emit('get_history', { chatWith: chatId, offset: 0 }); 
     }
 
-    messagesDiv.addEventListener('scroll', () => { if (messagesDiv.scrollTop === 0 && !isLoadingHistory && hasMoreHistory) { isLoadingHistory = true; currentOffset += 40; socket.emit('get_history', { chatWith: selectedChatId, offset: currentOffset }); } });
+    messagesDiv.addEventListener('scroll', () => { 
+        if (messagesDiv.scrollTop === 0 && !isLoadingHistory && hasMoreHistory) { 
+            isLoadingHistory = true; 
+            currentOffset += 40; 
+            socket.emit('get_history', { chatWith: selectedChatId, offset: currentOffset }); 
+        } 
+    });
 
-    let ctxTarget = null; let longPressTimer;
+    let ctxTarget = null; 
+    let longPressTimer;
+    
     function openContextMenu(e, id, isMine, from, text) {
-        e.preventDefault(); ctxTarget = { id, isMine, from, text };
-        const editBtn = document.getElementById('ctx-edit-btn'); if (isMine) editBtn.style.display = 'flex'; else editBtn.style.display = 'none';
-        const pinBtn = document.getElementById('ctx-pin-btn'); if (isCurrentChatGroup) pinBtn.style.display = 'flex'; else pinBtn.style.display = 'none';
-        contextMenuEl.classList.remove('hidden'); contextMenuEl.style.display = 'flex';
-        let x = e.pageX || (e.touches ? e.touches[0].pageX : 0); let y = e.pageY || (e.touches ? e.touches[0].pageY : 0);
+        e.preventDefault(); 
+        ctxTarget = { id, isMine, from, text };
+        
+        const editBtn = document.getElementById('ctx-edit-btn'); 
+        if (isMine) editBtn.style.display = 'flex'; else editBtn.style.display = 'none';
+        
+        const pinBtn = document.getElementById('ctx-pin-btn'); 
+        if (isCurrentChatGroup) pinBtn.style.display = 'flex'; else pinBtn.style.display = 'none';
+        
+        contextMenuEl.classList.remove('hidden'); 
+        contextMenuEl.style.display = 'flex';
+        
+        let x = e.pageX || (e.touches ? e.touches[0].pageX : 0); 
+        let y = e.pageY || (e.touches ? e.touches[0].pageY : 0);
+        
         const rect = contextMenuEl.getBoundingClientRect(); 
-        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 10; if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 10;
-        contextMenuEl.style.left = `${x}px`; contextMenuEl.style.top = `${y}px`; setTimeout(() => contextMenuEl.classList.add('show'), 10);
+        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 10; 
+        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 10;
+        
+        contextMenuEl.style.left = `${x}px`; 
+        contextMenuEl.style.top = `${y}px`; 
+        
+        setTimeout(() => contextMenuEl.classList.add('show'), 10);
     }
-    function closeContextMenu() { contextMenuEl.classList.remove('show'); setTimeout(() => contextMenuEl.classList.add('hidden'), 200); }
-    function contextReact(emoji) { if(ctxTarget) socket.emit('add_reaction', { id: ctxTarget.id, emoji }); closeContextMenu(); }
-    function contextReply() { if(ctxTarget) startReply(ctxTarget.from, ctxTarget.text || 'Медиа'); closeContextMenu(); }
-    function contextEdit() { if (!ctxTarget || !ctxTarget.isMine) return; editData = { id: ctxTarget.id }; msgInput.value = ctxTarget.text || ''; msgInput.focus(); sendBtn.innerHTML = '<i class="fas fa-check"></i>'; sendBtn.classList.remove('hidden'); micBtn.classList.add('hidden'); closeContextMenu(); }
-    function contextPin() { if (!ctxTarget) return; socket.emit('pin_msg', { id: ctxTarget.id, text: ctxTarget.text, chatId: selectedChatId }); closeContextMenu(); }
-    function contextDelete() { if(!ctxTarget) return; if (ctxTarget.isMine && selectedChatId !== 'me') { if (confirm("Удалить для ВСЕХ?")) socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: true }); else socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false }); } else { if (confirm("Удалить у себя?")) socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false }); } closeContextMenu(); }
+    
+    function closeContextMenu() { 
+        contextMenuEl.classList.remove('show'); 
+        setTimeout(() => contextMenuEl.classList.add('hidden'), 200); 
+    }
+    
+    function contextReact(emoji) { 
+        if(ctxTarget) socket.emit('add_reaction', { id: ctxTarget.id, emoji }); 
+        closeContextMenu(); 
+    }
+    
+    function contextReply() { 
+        if(ctxTarget) startReply(ctxTarget.from, ctxTarget.text || 'Медиа'); 
+        closeContextMenu(); 
+    }
+    
+    function contextEdit() { 
+        if (!ctxTarget || !ctxTarget.isMine) return; 
+        editData = { id: ctxTarget.id }; 
+        msgInput.value = ctxTarget.text || ''; 
+        msgInput.focus(); 
+        sendBtn.innerHTML = '<i class="fas fa-check"></i>'; 
+        sendBtn.classList.remove('hidden'); 
+        micBtn.classList.add('hidden'); 
+        closeContextMenu(); 
+    }
+    
+    function contextPin() { 
+        if (!ctxTarget) return; 
+        socket.emit('pin_msg', { id: ctxTarget.id, text: ctxTarget.text, chatId: selectedChatId }); 
+        closeContextMenu(); 
+    }
+    
+    function contextDelete() { 
+        if(!ctxTarget) return; 
+        if (ctxTarget.isMine && selectedChatId !== 'me') { 
+            if (confirm("Удалить для ВСЕХ?")) {
+                socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: true }); 
+            } else {
+                socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false }); 
+            }
+        } else { 
+            if (confirm("Удалить у себя?")) {
+                socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false }); 
+            }
+        } 
+        closeContextMenu(); 
+    }
 
     function generateReactionsHtml(msgId, reactionsObj) { 
-        if (!reactionsObj) return ''; let html = ''; 
+        if (!reactionsObj) return ''; 
+        let html = ''; 
         for (const [emoji, users] of Object.entries(reactionsObj)) { 
-            if (users.length > 0) { const reacted = users.includes(currentUser.username); html += `<div class="reaction-badge ${reacted ? 'reacted' : ''}" onclick="socket.emit('add_reaction', {id: '${msgId}', emoji: '${emoji}'})">${emoji} <small>${users.length}</small></div>`; } 
+            if (users.length > 0) { 
+                const reacted = users.includes(currentUser.username); 
+                html += `<div class="reaction-badge ${reacted ? 'reacted' : ''}" onclick="socket.emit('add_reaction', {id: '${msgId}', emoji: '${emoji}'})">${emoji} <small>${users.length}</small></div>`; 
+            } 
         } 
         return html; 
     }
 
-    // ФИКС ВЫРАВНИВАНИЯ СООБЩЕНИЙ
     function renderMsg(msg, isPrepend = false) {
-        const isMine = msg.from === currentUser.username; const isSaved = selectedChatId === 'me'; 
+        const isMine = (msg.from || '').toLowerCase() === (currentUser.username || '').toLowerCase(); 
+        const isSaved = selectedChatId === 'me'; 
+        
         const div = document.createElement('div'); 
         div.className = `message-row ${isMine ? 'mine' : 'other'}`; 
         div.setAttribute('data-id', msg.id);
@@ -1283,73 +1493,277 @@
             }
         }
         
-        let senderNameHtml = ''; if (!isMine && !isSaved && isCurrentChatGroup) senderNameHtml = `<div class="msg-sender-name" onclick="viewUserProfile('${msg.from}')">${msg.fromDisplayName || msg.from} ${msg.emojiStatus ? `<span class="emoji-status-badge" style="font-size:0.7rem">${msg.emojiStatus}</span>` : ''}</div>`;
-        if (msg.text) contentHtml += `<div class="text">${msg.text} ${msg.isEdited ? '<small style="opacity:0.6; font-size:0.75rem;">(изм.)</small>' : ''}</div>`;
+        let senderNameHtml = ''; 
+        if (!isMine && !isSaved && isCurrentChatGroup) {
+            senderNameHtml = `<div class="msg-sender-name" onclick="viewUserProfile('${msg.from}')">${msg.fromDisplayName || msg.from} ${msg.emojiStatus ? `<span class="emoji-status-badge" style="font-size:0.7rem">${msg.emojiStatus}</span>` : ''}</div>`;
+        }
+        
+        if (msg.text) {
+            contentHtml += `<div class="text">${msg.text} ${msg.isEdited ? '<small style="opacity:0.6; font-size:0.75rem;">(изм.)</small>' : ''}</div>`;
+        }
         
         let replyMarkup = msg.reply ? `<div class="msg-reply-info"><small>↩ ${msg.reply.username}</small><div>${msg.reply.text}</div></div>` : '';
         const ticksHtml = isMine ? `<span class="status-ticks ${msg.read ? 'read' : ''}"><i class="fas fa-check"></i>${msg.read ? '<i class="fas fa-check" style="margin-left:-4px"></i>' : ''}</span>` : '';
+        
         const avId = 'msg-av-' + Math.random().toString(36).substr(2, 9); 
         const reactionsHtml = `<div class="msg-reactions" id="reactions-${msg.id}">${generateReactionsHtml(msg.id, msg.reactions)}</div>`;
         
-        // Разделяем верстку: если мое - без аватарки
-        if (isMine) {
-            div.innerHTML = `<div class="bubble">${replyMarkup}${contentHtml}<div class="msg-footer"><span class="time">${msg.time || ''}</span>${ticksHtml}</div>${reactionsHtml}</div>`;
-        } else {
-            let avatarMarkup = isSaved ? '' : `<div class="avatar msg-avatar" id="${avId}" onclick="viewUserProfile('${msg.from}')"></div>`;
-            div.innerHTML = `${avatarMarkup}<div class="bubble">${senderNameHtml}${replyMarkup}${contentHtml}<div class="msg-footer"><span class="time">${msg.time || ''}</span>${ticksHtml}</div>${reactionsHtml}</div>`;
+        let avatarMarkup = ''; 
+        if (!isMine && !isSaved) {
+            avatarMarkup = `<div class="avatar msg-avatar" id="${avId}" onclick="viewUserProfile('${msg.from}')"></div>`;
         }
         
-        if (isPrepend) messagesDiv.insertBefore(div, messagesDiv.firstChild); else messagesDiv.appendChild(div);
+        div.innerHTML = `${avatarMarkup}<div class="bubble">${senderNameHtml}${replyMarkup}${contentHtml}<div class="msg-footer"><span class="time">${msg.time || ''}</span>${ticksHtml}</div>${reactionsHtml}</div>`;
+        
+        if (isPrepend) {
+            messagesDiv.insertBefore(div, messagesDiv.firstChild); 
+        } else {
+            messagesDiv.appendChild(div);
+        }
         
         const bubbleEl = div.querySelector('.bubble'); 
         bubbleEl.oncontextmenu = (e) => openContextMenu(e, msg.id, isMine, msg.from, msg.text); 
-        bubbleEl.ontouchstart = (e) => { longPressTimer = setTimeout(() => { openContextMenu(e, msg.id, isMine, msg.from, msg.text); }, 500); }; 
-        bubbleEl.ontouchend = () => clearTimeout(longPressTimer); bubbleEl.ontouchmove = () => clearTimeout(longPressTimer);
+        
+        bubbleEl.ontouchstart = (e) => { 
+            longPressTimer = setTimeout(() => { 
+                openContextMenu(e, msg.id, isMine, msg.from, msg.text); 
+            }, 500); 
+        }; 
+        
+        bubbleEl.ontouchend = () => clearTimeout(longPressTimer); 
+        bubbleEl.ontouchmove = () => clearTimeout(longPressTimer);
         
         if (!isMine && !isSaved) { 
             fetch(`/api/entity/${msg.from}`).then(res => res.json()).then(data => { 
                 const avEl = document.getElementById(avId); 
-                if (avEl) { if (data.isBlocked) { avEl.style.backgroundImage = 'none'; avEl.style.background = 'var(--bg-hover)'; avEl.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } else if (data.avatar) { avEl.style.backgroundImage = `url(${data.avatar})`; avEl.textContent = ''; } else { avEl.style.background = data.profileColor || 'var(--primary)'; avEl.textContent = (data.displayName || data.name || msg.from)[0].toUpperCase(); } } 
+                if (avEl) { 
+                    if (data.isBlocked) { 
+                        avEl.style.backgroundImage = 'none'; 
+                        avEl.style.background = 'var(--bg-hover)'; 
+                        avEl.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; 
+                    } else if (data.avatar) { 
+                        avEl.style.backgroundImage = `url(${data.avatar})`; 
+                        avEl.textContent = ''; 
+                    } else { 
+                        avEl.style.background = data.profileColor || 'var(--primary)'; 
+                        avEl.textContent = (data.displayName || data.name || msg.from)[0].toUpperCase(); 
+                    } 
+                } 
             }).catch(()=>{}); 
         }
     }
 
     function send() {
         const text = msgInput.value.trim();
-        if (editData && text) { socket.emit('edit_msg', { id: editData.id, text: text }); editData = null; msgInput.value = ''; sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>'; toggleInputButtons(); } 
-        else if ((text || replyData) && selectedChatId) { socket.emit('private_msg', { to: selectedChatId, text: text, reply: replyData }); msgInput.value = ''; toggleInputButtons(); cancelReply(); socket.emit('stop_typing', { to: selectedChatId }); }
+        if (editData && text) { 
+            socket.emit('edit_msg', { id: editData.id, text: text }); 
+            editData = null; 
+            msgInput.value = ''; 
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>'; 
+            toggleInputButtons(); 
+        } else if ((text || replyData) && selectedChatId) { 
+            socket.emit('private_msg', { to: selectedChatId, text: text, reply: replyData }); 
+            msgInput.value = ''; 
+            toggleInputButtons(); 
+            cancelReply(); 
+            socket.emit('stop_typing', { to: selectedChatId }); 
+        }
     }
 
-    function toggleInputButtons() { if (msgInput.value.trim().length > 0) { sendBtn.classList.remove('hidden'); micBtn.classList.add('hidden'); } else { sendBtn.classList.add('hidden'); micBtn.classList.remove('hidden'); } }
-    msgInput.addEventListener('input', () => { toggleInputButtons(); if (selectedChatId && selectedChatId !== 'me') { socket.emit('typing', { to: selectedChatId }); clearTimeout(typingTimer); typingTimer = setTimeout(() => { socket.emit('stop_typing', { to: selectedChatId }); }, 2000); } });
+    function toggleInputButtons() { 
+        if (msgInput.value.trim().length > 0) { 
+            sendBtn.classList.remove('hidden'); 
+            micBtn.classList.add('hidden'); 
+        } else { 
+            sendBtn.classList.add('hidden'); 
+            micBtn.classList.remove('hidden'); 
+        } 
+    }
+    
+    msgInput.addEventListener('input', () => { 
+        toggleInputButtons(); 
+        if (selectedChatId && selectedChatId !== 'me') { 
+            socket.emit('typing', { to: selectedChatId }); 
+            clearTimeout(typingTimer); 
+            typingTimer = setTimeout(() => { 
+                socket.emit('stop_typing', { to: selectedChatId }); 
+            }, 2000); 
+        } 
+    });
 
-    function toggleChatSearch() { const bar = document.getElementById('chat-search-bar'); bar.classList.toggle('hidden'); if (!bar.classList.contains('hidden')) document.getElementById('chat-search-input').focus(); else { document.getElementById('chat-search-input').value = ''; openChat(selectedChatId); } }
-    function performChatSearch() { const query = document.getElementById('chat-search-input').value.trim(); if (query) socket.emit('search_chat', { chatWith: selectedChatId, query: query }); }
+    function toggleChatSearch() { 
+        const bar = document.getElementById('chat-search-bar'); 
+        bar.classList.toggle('hidden'); 
+        if (!bar.classList.contains('hidden')) {
+            document.getElementById('chat-search-input').focus(); 
+        } else { 
+            document.getElementById('chat-search-input').value = ''; 
+            openChat(selectedChatId); 
+        } 
+    }
+    
+    function performChatSearch() { 
+        const query = document.getElementById('chat-search-input').value.trim(); 
+        if (query) {
+            socket.emit('search_chat', { chatWith: selectedChatId, query: query }); 
+        }
+    }
 
     let mediaRecorder, audioChunks = [], isRecording = false, isCancelled = false, recordingTimerId, recordingStartTime, startX, typingTimer;
+    
     async function startRecording(e) {
         if (!selectedChatId || isRecording) return;
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); mediaRecorder = new MediaRecorder(stream); audioChunks = []; isCancelled = false;
-            mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
-            mediaRecorder.onstop = () => { stream.getTracks().forEach(track => track.stop()); clearInterval(recordingTimerId); resetRecordingUI(); if (!isCancelled && audioChunks.length > 0) { const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); sendVoiceMessage(audioBlob); } isRecording = false; if(selectedChatId !== 'me') socket.emit('stop_typing', { to: selectedChatId }); };
-            mediaRecorder.start(); isRecording = true; if(selectedChatId !== 'me') socket.emit('typing', { to: selectedChatId }); startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX; showRecordingUI();
-        } catch (err) { showToast("Нет доступа к микрофону"); }
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); 
+            mediaRecorder = new MediaRecorder(stream); 
+            audioChunks = []; 
+            isCancelled = false;
+            
+            mediaRecorder.ondataavailable = event => { 
+                if (event.data.size > 0) audioChunks.push(event.data); 
+            };
+            
+            mediaRecorder.onstop = () => { 
+                stream.getTracks().forEach(track => track.stop()); 
+                clearInterval(recordingTimerId); 
+                resetRecordingUI(); 
+                
+                if (!isCancelled && audioChunks.length > 0) { 
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
+                    sendVoiceMessage(audioBlob); 
+                } 
+                isRecording = false; 
+                if(selectedChatId !== 'me') {
+                    socket.emit('stop_typing', { to: selectedChatId }); 
+                }
+            };
+            
+            mediaRecorder.start(); 
+            isRecording = true; 
+            
+            if(selectedChatId !== 'me') {
+                socket.emit('typing', { to: selectedChatId }); 
+            }
+            
+            startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX; 
+            showRecordingUI();
+        } catch (err) { 
+            showToast("Нет доступа к микрофону"); 
+        }
     }
-    function stopRecording() { if (mediaRecorder && isRecording) mediaRecorder.stop(); }
-    function cancelRecording() { if (isRecording) { isCancelled = true; mediaRecorder.stop(); } }
-    function showRecordingUI() { msgInput.classList.add('hidden'); attachBtn.classList.add('hidden'); recordUI.classList.remove('hidden'); micBtn.classList.add('recording-active'); recordingStartTime = Date.now(); recordTimeDisplay.textContent = "0:00"; recordingTimerId = setInterval(() => { const diff = Math.floor((Date.now() - recordingStartTime) / 1000); const mins = Math.floor(diff / 60); const secs = diff % 60; recordTimeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; }, 1000); }
-    function resetRecordingUI() { msgInput.classList.remove('hidden'); attachBtn.classList.remove('hidden'); recordUI.classList.add('hidden'); micBtn.classList.remove('recording-active'); micBtn.style.transform = 'translateX(0px)'; }
-    function sendVoiceMessage(blob) { const reader = new FileReader(); reader.onloadend = () => { socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: 'voice', data: reader.result, name: 'Voice.webm' }, reply: replyData }); cancelReply(); }; reader.readAsDataURL(blob); }
-    micBtn.addEventListener('mousedown', startRecording); micBtn.addEventListener('touchstart', startRecording, {passive: true}); window.addEventListener('mouseup', () => { if (isRecording) stopRecording(); }); window.addEventListener('touchend', () => { if (isRecording) stopRecording(); }); window.addEventListener('mousemove', (e) => { if (isRecording) handleSwipe(e.clientX); }); window.addEventListener('touchmove', (e) => { if (isRecording) handleSwipe(e.touches[0].clientX); }, {passive: true}); 
-    function handleSwipe(currentX) { const diffX = startX - currentX; if (diffX > 10) micBtn.style.transform = `translateX(-${Math.min(diffX, 150)}px)`; if (diffX > 120) cancelRecording(); }
+    
+    function stopRecording() { 
+        if (mediaRecorder && isRecording) mediaRecorder.stop(); 
+    }
+    
+    function cancelRecording() { 
+        if (isRecording) { 
+            isCancelled = true; 
+            mediaRecorder.stop(); 
+        } 
+    }
+    
+    function showRecordingUI() { 
+        msgInput.classList.add('hidden'); 
+        attachBtn.classList.add('hidden'); 
+        recordUI.classList.remove('hidden'); 
+        micBtn.classList.add('recording-active'); 
+        recordingStartTime = Date.now(); 
+        document.getElementById('record-time').textContent = "0:00"; 
+        
+        recordingTimerId = setInterval(() => { 
+            const diff = Math.floor((Date.now() - recordingStartTime) / 1000); 
+            const mins = Math.floor(diff / 60); 
+            const secs = diff % 60; 
+            document.getElementById('record-time').textContent = `${mins}:${secs.toString().padStart(2, '0')}`; 
+        }, 1000); 
+    }
+    
+    function resetRecordingUI() { 
+        msgInput.classList.remove('hidden'); 
+        attachBtn.classList.remove('hidden'); 
+        recordUI.classList.add('hidden'); 
+        micBtn.classList.remove('recording-active'); 
+        micBtn.style.transform = 'translateX(0px)'; 
+    }
+    
+    function sendVoiceMessage(blob) { 
+        const reader = new FileReader(); 
+        reader.onloadend = () => { 
+            socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: 'voice', data: reader.result, name: 'Voice.webm' }, reply: replyData }); 
+            cancelReply(); 
+        }; 
+        reader.readAsDataURL(blob); 
+    }
+    
+    micBtn.addEventListener('mousedown', startRecording); 
+    micBtn.addEventListener('touchstart', startRecording, {passive: true}); 
+    window.addEventListener('mouseup', () => { if (isRecording) stopRecording(); }); 
+    window.addEventListener('touchend', () => { if (isRecording) stopRecording(); }); 
+    window.addEventListener('mousemove', (e) => { if (isRecording) handleSwipe(e.clientX); }); 
+    window.addEventListener('touchmove', (e) => { if (isRecording) handleSwipe(e.touches[0].clientX); }, {passive: true}); 
+    
+    function handleSwipe(currentX) { 
+        const diffX = startX - currentX; 
+        if (diffX > 10) {
+            micBtn.style.transform = `translateX(-${Math.min(diffX, 150)}px)`; 
+        }
+        if (diffX > 120) {
+            cancelRecording(); 
+        }
+    }
 
-    socket.on('user_status_change', (data) => { if (data.username === selectedChatId && !isCurrentChatGroup) updateChatStatus(data.username, false, data.online, data.lastSeen); if (viewingUserProfile === data.username && viewingEntityData && viewingEntityData.type === 'user') { if (data.lastSeen === 'blocked') document.getElementById('p-status').textContent = dict[currentLang].blockedStatus; else if (data.online) document.getElementById('p-status').textContent = dict[currentLang].online; else document.getElementById('p-status').textContent = formatLastSeen(data.lastSeen); } const dot = document.getElementById(`online-dot-${data.username}`); if (dot) dot.style.display = (data.online && data.lastSeen !== 'blocked') ? 'block' : 'none'; const sub = document.getElementById(`contact-sub-${data.username}`); if (sub && !data.online && sub.textContent === dict[currentLang].typing) sub.textContent = ''; });
-    socket.on('user_typing', (data) => { if (data.to === selectedChatId) { chatStatusEl.textContent = dict[currentLang].typing; chatStatusEl.classList.add('typing'); } const sub = document.getElementById(`contact-sub-${data.to}`); if (sub) { sub.textContent = dict[currentLang].typing; sub.classList.add('typing'); } });
-    socket.on('user_stop_typing', (data) => { if (data.to === selectedChatId) updateChatStatus(selectedChatId, isCurrentChatGroup); const sub = document.getElementById(`contact-sub-${data.to}`); if (sub) { sub.textContent = ''; sub.classList.remove('typing'); } });
+    socket.on('user_status_change', (data) => { 
+        if (data.username === selectedChatId && !isCurrentChatGroup) {
+            updateChatStatus(data.username, false, data.online, data.lastSeen); 
+        }
+        
+        if (viewingUserProfile === data.username && viewingEntityData && viewingEntityData.type === 'user') { 
+            if (data.lastSeen === 'blocked') {
+                document.getElementById('p-status').textContent = dict[currentLang].blockedStatus; 
+            } else if (data.online) {
+                document.getElementById('p-status').textContent = dict[currentLang].online; 
+            } else {
+                document.getElementById('p-status').textContent = formatLastSeen(data.lastSeen); 
+            }
+        } 
+        
+        const dot = document.getElementById(`online-dot-${data.username}`); 
+        if (dot) {
+            dot.style.display = (data.online && data.lastSeen !== 'blocked') ? 'block' : 'none'; 
+        }
+        
+        const sub = document.getElementById(`contact-sub-${data.username}`); 
+        if (sub && !data.online && sub.textContent === dict[currentLang].typing) {
+            sub.textContent = ''; 
+        }
+    });
+
+    socket.on('user_typing', (data) => { 
+        if (data.to === selectedChatId) { 
+            chatStatusEl.textContent = dict[currentLang].typing; 
+            chatStatusEl.classList.add('typing'); 
+        } 
+        const sub = document.getElementById(`contact-sub-${data.to}`); 
+        if (sub) { 
+            sub.textContent = dict[currentLang].typing; 
+            sub.classList.add('typing'); 
+        } 
+    });
+
+    socket.on('user_stop_typing', (data) => { 
+        if (data.to === selectedChatId) {
+            updateChatStatus(selectedChatId, isCurrentChatGroup); 
+        }
+        const sub = document.getElementById(`contact-sub-${data.to}`); 
+        if (sub) { 
+            sub.textContent = ''; 
+            sub.classList.remove('typing'); 
+        } 
+    });
     
     socket.on('user_updated', (data) => {
-        if(currentUser && data.username === currentUser.username) {
+        if(data.username === currentUser.username) {
             currentUser = data.user;
             updateHeaderUI();
         }
@@ -1357,38 +1771,227 @@
         updateContactsUI(data.username);
     });
 
-    socket.on('msg_receive', (msg) => { const isCurrentChat = (msg.to === selectedChatId || (msg.from === selectedChatId && msg.to === currentUser.username) || (selectedChatId === 'me' && msg.to === 'me')); if (isCurrentChat) { renderMsg(msg, false); messagesDiv.scrollTop = messagesDiv.scrollHeight; if (msg.from !== currentUser.username) { document.getElementById('snd-notify').play().catch(()=>{}); socket.emit('mark_read', { chatWith: msg.to === currentUser.username ? msg.from : msg.to }); socket.emit('stop_typing', { to: selectedChatId }); } else document.getElementById('snd-send').play().catch(()=>{}); } else { document.getElementById('snd-notify').play().catch(()=>{}); const chatIdForUnread = msg.to === currentUser.username ? msg.from : msg.to; if(msg.from !== currentUser.username) { unreadCounts[chatIdForUnread] = (unreadCounts[chatIdForUnread] || 0) + 1; updateContactsUI(chatIdForUnread); if ("Notification" in window && Notification.permission === "granted" && document.hidden) new Notification(`Новое сообщение`, { body: msg.text || "Медиафайл", icon: '/icon.png' }); } } });
-    socket.on('messages_read', (data) => { if (selectedChatId === data.by || selectedChatId === data.chatId) { document.querySelectorAll('.mine .status-ticks').forEach(el => { el.classList.add('read'); el.innerHTML = '<i class="fas fa-check"></i><i class="fas fa-check" style="margin-left:-4px"></i>'; }); } });
-    socket.on('msg_deleted', (data) => { const el = document.querySelector(`[data-id="${data.id}"]`); if (el) el.remove(); });
-    socket.on('msg_edited', (data) => { const row = document.querySelector(`.message-row[data-id="${data.id}"]`); if (row) { let textDiv = row.querySelector('.text'); if (!textDiv) { textDiv = document.createElement('div'); textDiv.className = 'text'; row.querySelector('.bubble').insertBefore(textDiv, row.querySelector('.msg-footer')); } textDiv.innerHTML = `${data.text} <small style="opacity:0.6; font-size:0.75rem;">(изм.)</small>`; } });
-    socket.on('msg_pinned', (data) => { if (selectedChatId === data.chatId) { document.getElementById('pinned-banner').classList.remove('hidden'); document.getElementById('pinned-text').textContent = data.text || "Медиафайл"; } });
-    socket.on('msg_reaction_update', (data) => { const container = document.getElementById(`reactions-${data.id}`); if (container) container.innerHTML = generateReactionsHtml(data.id, data.reactions); });
-    
-    socket.on('chat_history', (data) => { let history, offset, chatWith, isSearch; if (Array.isArray(data)) { history = data; offset = 0; isSearch = false; } else { history = data.history; offset = data.offset; chatWith = data.chatWith; isSearch = data.isSearch; } if (history.length < 40) hasMoreHistory = false; const oldScrollHeight = messagesDiv.scrollHeight; if (offset === 0 || isSearch) messagesDiv.innerHTML = ''; if (offset === 0 || isSearch) { history.forEach(msg => renderMsg(msg, false)); messagesDiv.scrollTop = messagesDiv.scrollHeight; } else { for (let i = history.length - 1; i >= 0; i--) renderMsg(history[i], true); messagesDiv.scrollTop = messagesDiv.scrollHeight - oldScrollHeight; } isLoadingHistory = false; });
-    socket.on('contact_toggled', (data) => { if (viewingUserProfile === data.username) updateProfileContactBtn(data.inContacts); socket.emit('get_my_chats'); });
-    socket.on('block_toggled', (data) => { if (viewingUserProfile === data.username) updateProfileBlockBtn(data.isBlocked); if (selectedChatId === data.username) openChat(data.username); });
-    socket.on('group_created', (data) => { showToast(dict[currentLang].groupCreated); toggleCreateGroupModal(false); socket.emit('get_my_chats'); openChat(data.groupId); });
-    socket.on('group_updated', (data) => { if(selectedChatId === data.groupId) openChat(data.groupId); if(viewingUserProfile === data.groupId) viewUserProfile(data.groupId); updateContactsUI(data.groupId); });
-    socket.on('kicked_from_group', (data) => { showToast("Вы были исключены из чата"); if(selectedChatId === data.groupId) { document.getElementById('chat-ui').classList.add('hidden'); document.getElementById('welcome-screen').classList.remove('hidden'); } socket.emit('get_my_chats'); });
+    socket.on('msg_receive', (msg) => { 
+        const isCurrentChat = (msg.to === selectedChatId || (msg.from === selectedChatId && msg.to === currentUser.username) || (selectedChatId === 'me' && msg.to === 'me')); 
+        
+        if (isCurrentChat) { 
+            renderMsg(msg, false); 
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; 
+            
+            if (msg.from !== currentUser.username) { 
+                document.getElementById('snd-notify').play().catch(()=>{}); 
+                socket.emit('mark_read', { chatWith: msg.to === currentUser.username ? msg.from : msg.to }); 
+                socket.emit('stop_typing', { to: selectedChatId }); 
+            } else {
+                document.getElementById('snd-send').play().catch(()=>{}); 
+            }
+        } else { 
+            document.getElementById('snd-notify').play().catch(()=>{}); 
+            const chatIdForUnread = msg.to === currentUser.username ? msg.from : msg.to; 
+            
+            if(msg.from !== currentUser.username) { 
+                unreadCounts[chatIdForUnread] = (unreadCounts[chatIdForUnread] || 0) + 1; 
+                updateContactsUI(chatIdForUnread); 
+                
+                if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+                    new Notification(`Новое сообщение`, { body: msg.text || "Медиафайл", icon: '/icon.png' }); 
+                }
+            } 
+        } 
+    });
 
-    searchInput.onkeypress = (e) => { if (e.key === 'Enter' && searchInput.value.trim()) socket.emit('search_user', searchInput.value.trim().replace('@', '')); };
-    socket.on('search_result', (data) => { if (data.exists) { openChat(data.username); searchInput.value = ''; } else showToast(dict[currentLang].notFound); });
-    socket.on('my_chats_list', (chats) => { contactsDiv.innerHTML = ''; chats.forEach(chatId => updateContactsUI(chatId)); });
+    socket.on('messages_read', (data) => { 
+        if (selectedChatId === data.by || selectedChatId === data.chatId) { 
+            document.querySelectorAll('.mine .status-ticks').forEach(el => { 
+                el.classList.add('read'); 
+                el.innerHTML = '<i class="fas fa-check"></i><i class="fas fa-check" style="margin-left:-4px"></i>'; 
+            }); 
+        } 
+    });
+
+    socket.on('msg_deleted', (data) => { 
+        const el = document.querySelector(`[data-id="${data.id}"]`); 
+        if (el) el.remove(); 
+    });
+
+    socket.on('msg_edited', (data) => { 
+        const row = document.querySelector(`.message-row[data-id="${data.id}"]`); 
+        if (row) { 
+            let textDiv = row.querySelector('.text'); 
+            if (!textDiv) { 
+                textDiv = document.createElement('div'); 
+                textDiv.className = 'text'; 
+                row.querySelector('.bubble').insertBefore(textDiv, row.querySelector('.msg-footer')); 
+            } 
+            textDiv.innerHTML = `${data.text} <small style="opacity:0.6; font-size:0.75rem;">(изм.)</small>`; 
+        } 
+    });
+
+    socket.on('msg_pinned', (data) => { 
+        if (selectedChatId === data.chatId) { 
+            document.getElementById('pinned-banner').classList.remove('hidden'); 
+            document.getElementById('pinned-text').textContent = data.text || "Медиафайл"; 
+        } 
+    });
+
+    socket.on('msg_reaction_update', (data) => { 
+        const container = document.getElementById(`reactions-${data.id}`); 
+        if (container) {
+            container.innerHTML = generateReactionsHtml(data.id, data.reactions); 
+        }
+    });
+    
+    socket.on('chat_history', (data) => { 
+        let history, offset, chatWith, isSearch; 
+        
+        if (Array.isArray(data)) { 
+            history = data; 
+            offset = 0; 
+            isSearch = false; 
+        } else { 
+            history = data.history; 
+            offset = data.offset; 
+            chatWith = data.chatWith; 
+            isSearch = data.isSearch; 
+        } 
+        
+        if (history.length < 40) hasMoreHistory = false; 
+        
+        const oldScrollHeight = messagesDiv.scrollHeight; 
+        
+        if (offset === 0 || isSearch) messagesDiv.innerHTML = ''; 
+        
+        if (offset === 0 || isSearch) { 
+            history.forEach(msg => renderMsg(msg, false)); 
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; 
+        } else { 
+            for (let i = history.length - 1; i >= 0; i--) {
+                renderMsg(history[i], true); 
+            }
+            messagesDiv.scrollTop = messagesDiv.scrollHeight - oldScrollHeight; 
+        } 
+        
+        isLoadingHistory = false; 
+    });
+
+    socket.on('contact_toggled', (data) => { 
+        if (viewingUserProfile === data.username) {
+            updateProfileContactBtn(data.inContacts); 
+        }
+        socket.emit('get_my_chats'); 
+    });
+
+    socket.on('block_toggled', (data) => { 
+        if (viewingUserProfile === data.username) {
+            updateProfileBlockBtn(data.isBlocked); 
+        }
+        if (selectedChatId === data.username) {
+            openChat(data.username); 
+        }
+    });
+
+    socket.on('group_created', (data) => { 
+        showToast(dict[currentLang].groupCreated); 
+        toggleCreateGroupModal(false); 
+        socket.emit('get_my_chats'); 
+        openChat(data.groupId); 
+    });
+
+    socket.on('group_updated', (data) => { 
+        if(selectedChatId === data.groupId) openChat(data.groupId); 
+        if(viewingUserProfile === data.groupId) viewUserProfile(data.groupId); 
+        updateContactsUI(data.groupId); 
+    });
+
+    socket.on('kicked_from_group', (data) => { 
+        showToast("Вы были исключены из чата"); 
+        if(selectedChatId === data.groupId) { 
+            document.getElementById('chat-ui').classList.add('hidden'); 
+            document.getElementById('welcome-screen').classList.remove('hidden'); 
+        } 
+        socket.emit('get_my_chats'); 
+    });
+
+    searchInput.onkeypress = (e) => { 
+        if (e.key === 'Enter' && searchInput.value.trim()) {
+            socket.emit('search_user', searchInput.value.trim().replace('@', '')); 
+        }
+    };
+
+    socket.on('search_result', (data) => { 
+        if (data.exists) { 
+            openChat(data.username); 
+            searchInput.value = ''; 
+        } else {
+            showToast(dict[currentLang].notFound); 
+        }
+    });
+
+    socket.on('my_chats_list', (chats) => { 
+        contactsDiv.innerHTML = ''; 
+        chats.forEach(chatId => updateContactsUI(chatId)); 
+    });
 
     async function updateContactsUI(chatId) {
-        if (!currentUser || chatId === currentUser.username) return; 
+        if (chatId === currentUser.username) return; 
+        
         let el = document.getElementById(`contact-${chatId}`);
-        if (!el) { el = document.createElement('div'); el.id = `contact-${chatId}`; el.className = 'contact-item'; el.innerHTML = `<div class="avatar-wrapper"><div class="avatar" id="avatar-list-${chatId}"></div><div class="online-dot" id="online-dot-${chatId}"></div></div><div class="contact-info"><strong id="contact-name-${chatId}">${chatId}</strong><div class="contact-subtext" id="contact-sub-${chatId}"></div></div><div class="unread-badge hidden" id="unread-${chatId}">0</div>`; el.onclick = () => openChat(chatId); contactsDiv.prepend(el); } else { contactsDiv.prepend(el); }
-        updateUnreadBadge(chatId); const res = await fetch(`/api/entity/${chatId}`); const data = await res.json(); const nameEl = document.getElementById(`contact-name-${chatId}`); if(nameEl) nameEl.textContent = data.displayName || data.name || chatId; 
+        if (!el) { 
+            el = document.createElement('div'); 
+            el.id = `contact-${chatId}`; 
+            el.className = 'contact-item'; 
+            el.innerHTML = `<div class="avatar-wrapper"><div class="avatar" id="avatar-list-${chatId}"></div><div class="online-dot" id="online-dot-${chatId}"></div></div><div class="contact-info"><strong id="contact-name-${chatId}">${chatId}</strong><div class="contact-subtext" id="contact-sub-${chatId}"></div></div><div class="unread-badge hidden" id="unread-${chatId}">0</div>`; 
+            el.onclick = () => openChat(chatId); 
+            contactsDiv.prepend(el); 
+        } else { 
+            contactsDiv.prepend(el); 
+        }
+        
+        updateUnreadBadge(chatId); 
+        
+        const res = await fetch(`/api/entity/${chatId}`); 
+        const data = await res.json(); 
+        
+        const nameEl = document.getElementById(`contact-name-${chatId}`); 
+        if(nameEl) nameEl.textContent = data.displayName || data.name || chatId; 
+        
         const avEl = document.getElementById(`avatar-list-${chatId}`);
-        if (avEl) { if (data.isBlocked) { avEl.style.backgroundImage = 'none'; avEl.style.background = 'var(--bg-hover)'; avEl.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } else if (data.avatar) { avEl.style.backgroundImage = `url(${data.avatar})`; avEl.innerHTML = ''; } else { avEl.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); avEl.style.backgroundImage = 'none'; avEl.style.background = data.profileColor || 'var(--primary)'; avEl.innerHTML = ''; } }
-        const dot = document.getElementById(`online-dot-${chatId}`); if (dot) dot.style.display = (data.type === 'user' && data.isOnline && !data.isBlocked) ? 'block' : 'none';
+        if (avEl) { 
+            if (data.isBlocked) { 
+                avEl.style.backgroundImage = 'none'; 
+                avEl.style.background = 'var(--bg-hover)'; 
+                avEl.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; 
+            } else if (data.avatar) { 
+                avEl.style.backgroundImage = `url(${data.avatar})`; 
+                avEl.innerHTML = ''; 
+            } else { 
+                avEl.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); 
+                avEl.style.backgroundImage = 'none'; 
+                avEl.style.background = data.profileColor || 'var(--primary)'; 
+                avEl.innerHTML = ''; 
+            } 
+        }
+        
+        const dot = document.getElementById(`online-dot-${chatId}`); 
+        if (dot) {
+            dot.style.display = (data.type === 'user' && data.isOnline && !data.isBlocked) ? 'block' : 'none';
+        }
     }
 
-    function sendMediaFile(input) { const file = input.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: file.type.split('/')[0], data: e.target.result, name: file.name }, reply: replyData }); cancelReply(); }; reader.readAsDataURL(file); input.value = ''; }
+    function sendMediaFile(input) { 
+        const file = input.files[0]; 
+        if (!file) return; 
+        
+        const reader = new FileReader(); 
+        reader.onload = (e) => { 
+            socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: file.type.split('/')[0], data: e.target.result, name: file.name }, reply: replyData }); 
+            cancelReply(); 
+        }; 
+        reader.readAsDataURL(file); 
+        input.value = ''; 
+    }
     
     function updateHeaderUI() { 
-        if (!currentUser) return;
         const name = currentUser.name || currentUser.username; 
         document.getElementById('settings-full-name').textContent = name; 
         document.getElementById('settings-username-display').textContent = '@' + currentUser.username; 
@@ -1400,10 +2003,11 @@
         } else { 
             avatarEl.textContent = name[0].toUpperCase(); 
             avatarEl.style.backgroundImage = 'none'; 
-            avatarEl.style.background = currentUser.profileColor || '#8774e1'; 
+            avatarEl.style.background = currentUser.profileColor || 'var(--primary)'; 
         } 
         
         document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${currentUser.profilePattern || 'none'}`; 
+        
         if (currentUser.profileBg) {
             document.getElementById('settings-cover-preview').style.backgroundImage = `url(${currentUser.profileBg})`;
             document.getElementById('settings-cover-preview').style.backgroundSize = 'cover';
@@ -1413,41 +2017,126 @@
     }
     
     async function saveProfileGeneral() { 
-        const newName = document.getElementById('edit-display-name').value; const newBio = document.getElementById('edit-bio').value; const newBirthday = document.getElementById('edit-birthday').value; const newLocation = document.getElementById('edit-location').value; const newWebsite = document.getElementById('edit-website').value; 
-        const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName, bio: newBio, birthday: newBirthday, location: newLocation, website: newWebsite }) }); 
-        if (res.ok) { showToast("Профиль сохранен"); } 
+        const newName = document.getElementById('edit-display-name').value; 
+        const newBio = document.getElementById('edit-bio').value; 
+        const newBirthday = document.getElementById('edit-birthday').value; 
+        const newLocation = document.getElementById('edit-location').value; 
+        const newWebsite = document.getElementById('edit-website').value; 
+        
+        const res = await fetch('/update-profile', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({ name: newName, bio: newBio, birthday: newBirthday, location: newLocation, website: newWebsite }) 
+        }); 
+        
+        if (res.ok) { 
+            showToast("Профиль сохранен"); 
+        } 
     }
 
     async function saveProfileAppearance() { 
         const newColor = document.getElementById('edit-profile-color').value;
         const newEmoji = document.getElementById('edit-emoji-status').value;
-        const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ profileColor: newColor, emojiStatus: newEmoji }) }); 
-        if (res.ok) { showToast("Внешний вид профиля обновлен!"); } 
+        
+        const res = await fetch('/update-profile', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({ profileColor: newColor, emojiStatus: newEmoji }) 
+        }); 
+        
+        if (res.ok) { 
+            showToast("Внешний вид профиля обновлен!"); 
+        } 
     }
     
     async function savePrivacySettings() {
         const calls = document.getElementById('priv-calls').value;
         const online = document.getElementById('priv-online').value;
         const groups = document.getElementById('priv-groups').value;
-        const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ privacy: { calls, online, groups } }) }); 
-        if (res.ok) { showToast("Настройки приватности сохранены!"); } 
+        
+        const res = await fetch('/update-profile', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({ privacy: { calls, online, groups } }) 
+        }); 
+        
+        if (res.ok) { 
+            showToast("Настройки приватности сохранены!"); 
+        } 
     }
     
-    function uploadAvatar(input) { const file = input.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (e) => { const base64Img = e.target.result; const avatarEl = document.getElementById('user-avatar-main'); avatarEl.style.backgroundImage = `url(${base64Img})`; avatarEl.textContent = ''; const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ avatar: base64Img }) }); if (res.ok) { showToast(dict[currentLang].photoUpdated); } }; reader.readAsDataURL(file); }
-    function uploadProfileBg(input) { const file = input.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (e) => { const base64Img = e.target.result; document.getElementById('settings-cover-preview').style.backgroundImage = `url(${base64Img})`; document.getElementById('settings-cover-preview').style.backgroundSize = 'cover'; const res = await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ profileBg: base64Img }) }); if (res.ok) { showToast("Фон профиля обновлен!"); } }; reader.readAsDataURL(file); }
+    function uploadAvatar(input) { 
+        const file = input.files[0]; 
+        if (!file) return; 
+        
+        const reader = new FileReader(); 
+        reader.onload = async (e) => { 
+            const base64Img = e.target.result; 
+            const avatarEl = document.getElementById('user-avatar-main'); 
+            avatarEl.style.backgroundImage = `url(${base64Img})`; 
+            avatarEl.textContent = ''; 
+            
+            const res = await fetch('/update-profile', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ avatar: base64Img }) 
+            }); 
+            
+            if (res.ok) { 
+                showToast(dict[currentLang].photoUpdated); 
+            } 
+        }; 
+        reader.readAsDataURL(file); 
+    }
+    
+    function uploadProfileBg(input) { 
+        const file = input.files[0]; 
+        if (!file) return; 
+        
+        const reader = new FileReader(); 
+        reader.onload = async (e) => { 
+            const base64Img = e.target.result; 
+            document.getElementById('settings-cover-preview').style.backgroundImage = `url(${base64Img})`; 
+            document.getElementById('settings-cover-preview').style.backgroundSize = 'cover'; 
+            
+            const res = await fetch('/update-profile', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ profileBg: base64Img }) 
+            }); 
+            
+            if (res.ok) { 
+                showToast("Фон профиля обновлен!"); 
+            } 
+        }; 
+        reader.readAsDataURL(file); 
+    }
 
     async function viewUserProfile(chatId) {
-        viewingUserProfile = chatId; const res = await fetch(`/api/entity/${chatId}`); const data = await res.json(); viewingEntityData = data; 
+        viewingUserProfile = chatId; 
+        const res = await fetch(`/api/entity/${chatId}`); 
+        const data = await res.json(); 
+        viewingEntityData = data; 
         
         let emojiHtml = data.emojiStatus ? `<span class="emoji-status-badge">${data.emojiStatus}</span>` : '';
         document.getElementById('p-name').innerHTML = `${data.displayName || data.name || chatId} ${emojiHtml}`; 
         document.getElementById('p-username').textContent = '@' + chatId; 
-        document.getElementById('p-bio').textContent = data.bio || data.description || dict[currentLang].notSpecified; document.getElementById('p-bio-label').textContent = (data.type === 'group' || data.type === 'channel') ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
+        document.getElementById('p-bio').textContent = data.bio || data.description || dict[currentLang].notSpecified; 
+        document.getElementById('p-bio-label').textContent = (data.type === 'group' || data.type === 'channel') ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
         
         const pAvatar = document.getElementById('p-avatar'); 
-        if (data.isBlocked) { pAvatar.style.backgroundImage = 'none'; pAvatar.style.background = 'var(--bg-hover)'; pAvatar.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; } 
-        else if (data.avatar) { pAvatar.style.backgroundImage = `url(${data.avatar})`; pAvatar.innerHTML = ''; } 
-        else { pAvatar.style.backgroundImage = 'none'; pAvatar.style.background = data.profileColor || '#8774e1'; pAvatar.innerHTML = (data.displayName || data.name || chatId)[0].toUpperCase(); }
+        if (data.isBlocked) { 
+            pAvatar.style.backgroundImage = 'none'; 
+            pAvatar.style.background = 'var(--bg-hover)'; 
+            pAvatar.innerHTML = '<i class="fas fa-user-slash" style="color:var(--text-dim)"></i>'; 
+        } else if (data.avatar) { 
+            pAvatar.style.backgroundImage = `url(${data.avatar})`; 
+            pAvatar.innerHTML = ''; 
+        } else { 
+            pAvatar.style.backgroundImage = 'none'; 
+            pAvatar.style.background = data.profileColor || 'var(--primary)'; 
+            pAvatar.innerHTML = (data.displayName || data.name || chatId)[0].toUpperCase(); 
+        }
         
         document.getElementById('p-cover').className = `profile-cover pattern-${data.profilePattern || 'none'}`; 
         if (data.profileBg) {
@@ -1457,52 +2146,493 @@
             document.getElementById('p-cover').style.backgroundImage = '';
         }
 
-        document.getElementById('p-btn-message').onclick = () => { toggleProfileModal(false); openChat(chatId); };
-        const showField = (id, val) => { const el = document.getElementById(id); if(val) { el.classList.remove('hidden'); el.querySelector('.detail-value').textContent = val; if(id==='p-row-website') el.querySelector('.detail-value').href = val.startsWith('http') ? val : 'https://' + val; } else { el.classList.add('hidden'); } };
+        document.getElementById('p-btn-message').onclick = () => { 
+            toggleProfileModal(false); 
+            openChat(chatId); 
+        };
         
-        if (data.type === 'group' || data.type === 'channel') { document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()} (${data.type === 'channel' ? dict[currentLang].typeChannel : dict[currentLang].typeGroup})`; document.getElementById('p-row-birthday').classList.add('hidden'); showField('p-row-location', null); showField('p-row-website', null); document.getElementById('p-row-members').classList.remove('hidden'); document.getElementById('p-members-count').textContent = data.membersCount; if(data.isCreator) { document.getElementById('p-btn-edit').classList.remove('hidden'); } else { document.getElementById('p-btn-edit').classList.add('hidden'); } const mList = document.getElementById('p-members-list'); mList.innerHTML = ''; mList.style.display = 'block'; data.membersList.forEach(m => { const isMe = m.username === currentUser.username; const kickBtn = (data.isCreator && !isMe) ? `<button class="danger-btn-small" onclick="kickMember('${data.id}', '${m.username}')">${dict[currentLang].kickBtn}</button>` : ''; mList.innerHTML += `<div class="member-option" style="cursor:default"><span>${m.name} (@${m.username}) ${m.emojiStatus ? m.emojiStatus : ''}</span>${kickBtn}</div>`; }); document.getElementById('p-btn-contact').classList.add('hidden'); document.getElementById('p-btn-block').classList.add('hidden'); document.getElementById('p-btn-leave').classList.remove('hidden'); } 
-        else { if (data.isBlocked) document.getElementById('p-status').textContent = dict[currentLang].blockedStatus; else if (data.isOnline) document.getElementById('p-status').textContent = dict[currentLang].online; else document.getElementById('p-status').textContent = formatLastSeen(data.lastSeen); document.getElementById('p-row-members').classList.add('hidden'); document.getElementById('p-members-list').style.display = 'none'; document.getElementById('p-btn-edit').classList.add('hidden'); showField('p-row-birthday', data.birthday ? new Date(data.birthday).toLocaleDateString() : null); showField('p-row-location', data.location); showField('p-row-website', data.website); document.getElementById('p-btn-contact').classList.remove('hidden'); document.getElementById('p-btn-block').classList.remove('hidden'); document.getElementById('p-btn-leave').classList.add('hidden'); updateProfileContactBtn(data.inContacts); const myRes = await fetch('/my-full-profile'); const myData = await myRes.json(); updateProfileBlockBtn(myData.blocked && myData.blocked.includes(chatId)); }
+        const showField = (id, val) => { 
+            const el = document.getElementById(id); 
+            if(val) { 
+                el.classList.remove('hidden'); 
+                el.querySelector('.detail-value').textContent = val; 
+                if(id==='p-row-website') el.querySelector('.detail-value').href = val.startsWith('http') ? val : 'https://' + val; 
+            } else { 
+                el.classList.add('hidden'); 
+            } 
+        };
+        
+        if (data.type === 'group' || data.type === 'channel') { 
+            document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()} (${data.type === 'channel' ? dict[currentLang].typeChannel : dict[currentLang].typeGroup})`; 
+            document.getElementById('p-row-birthday').classList.add('hidden'); 
+            showField('p-row-location', null); 
+            showField('p-row-website', null); 
+            document.getElementById('p-row-members').classList.remove('hidden'); 
+            document.getElementById('p-members-count').textContent = data.membersCount; 
+            
+            if(data.isCreator) { 
+                document.getElementById('p-btn-edit').classList.remove('hidden'); 
+            } else { 
+                document.getElementById('p-btn-edit').classList.add('hidden'); 
+            } 
+            
+            const mList = document.getElementById('p-members-list'); 
+            mList.innerHTML = ''; 
+            mList.style.display = 'block'; 
+            
+            data.membersList.forEach(m => { 
+                const isMe = m.username === currentUser.username; 
+                const kickBtn = (data.isCreator && !isMe) ? `<button class="danger-btn-small" onclick="kickMember('${data.id}', '${m.username}')">${dict[currentLang].kickBtn}</button>` : ''; 
+                mList.innerHTML += `<div class="member-option" style="cursor:default"><span>${m.name} (@${m.username}) ${m.emojiStatus ? m.emojiStatus : ''}</span>${kickBtn}</div>`; 
+            }); 
+            
+            document.getElementById('p-btn-contact').classList.add('hidden'); 
+            document.getElementById('p-btn-block').classList.add('hidden'); 
+            document.getElementById('p-btn-leave').classList.remove('hidden'); 
+        } else { 
+            if (data.isBlocked) {
+                document.getElementById('p-status').textContent = dict[currentLang].blockedStatus; 
+            } else if (data.isOnline) {
+                document.getElementById('p-status').textContent = dict[currentLang].online; 
+            } else {
+                document.getElementById('p-status').textContent = formatLastSeen(data.lastSeen); 
+            }
+            
+            document.getElementById('p-row-members').classList.add('hidden'); 
+            document.getElementById('p-members-list').style.display = 'none'; 
+            document.getElementById('p-btn-edit').classList.add('hidden'); 
+            
+            showField('p-row-birthday', data.birthday ? new Date(data.birthday).toLocaleDateString() : null); 
+            showField('p-row-location', data.location); 
+            showField('p-row-website', data.website); 
+            
+            document.getElementById('p-btn-contact').classList.remove('hidden'); 
+            document.getElementById('p-btn-block').classList.remove('hidden'); 
+            document.getElementById('p-btn-leave').classList.add('hidden'); 
+            
+            updateProfileContactBtn(data.inContacts); 
+            
+            const myRes = await fetch('/my-full-profile'); 
+            const myData = await myRes.json(); 
+            updateProfileBlockBtn(myData.blocked && myData.blocked.includes(chatId)); 
+        }
+        
         toggleProfileModal(true);
     }
 
-    function kickMember(groupId, userId) { if(confirm("Удалить пользователя из сообщества?")) socket.emit('kick_member', { groupId, userId }); }
-    function toggleContact() { if(!viewingUserProfile || (viewingEntityData && viewingEntityData.type !== 'user')) return; const isContact = document.getElementById('p-icon-contact').className.includes('user-minus'); if (isContact) socket.emit('toggle_contact', {username: viewingUserProfile, remove: true}); else { document.getElementById('contact-custom-name').value = document.getElementById('p-name').textContent; document.getElementById('custom-contact-modal').classList.remove('hidden'); setTimeout(() => document.getElementById('custom-contact-modal').classList.add('show'), 10); } }
-    function saveContact() { socket.emit('toggle_contact', {username: viewingUserProfile, customName: document.getElementById('contact-custom-name').value.trim()}); closeModalOnOuterClick({target: {id: 'custom-contact-modal'}}, 'custom-contact-modal'); }
-    function toggleBlock() { if(viewingUserProfile && viewingEntityData && viewingEntityData.type === 'user') socket.emit('toggle_block', {username: viewingUserProfile}); }
-    function leaveGroup() { if(viewingUserProfile && viewingEntityData && viewingEntityData.type !== 'user') { if(confirm("Вы уверены, что хотите покинуть?")) { socket.emit('leave_group', { groupId: viewingUserProfile }); toggleProfileModal(false); if(selectedChatId === viewingUserProfile) { document.getElementById('chat-ui').classList.add('hidden'); document.getElementById('welcome-screen').classList.remove('hidden'); } } } }
-    function updateProfileContactBtn(inContacts) { const icon = document.getElementById('p-icon-contact'); const text = document.getElementById('p-text-contact'); if (inContacts) { icon.className = 'fas fa-user-minus'; text.textContent = dict[currentLang].removeContact; } else { icon.className = 'fas fa-user-plus'; text.textContent = dict[currentLang].addContact; } }
-    function updateProfileBlockBtn(isBlocked) { const icon = document.querySelector('#p-btn-block i'); const text = document.getElementById('p-text-block'); const btn = document.getElementById('p-btn-block'); if (isBlocked) { icon.className = 'fas fa-unlock'; text.textContent = dict[currentLang].unblockUser; btn.classList.remove('block-btn'); btn.style.color = '#4CAF50'; } else { icon.className = 'fas fa-ban'; text.textContent = dict[currentLang].blockUser; btn.classList.add('block-btn'); btn.style.color = '#ff3b30'; } }
-
-    async function toggleCreateGroupModal(show, editMode = false) { const modal = document.getElementById('create-group-modal'); if (show) { editModeGroupId = editMode ? viewingEntityData.id : null; document.getElementById('modal-group-title').textContent = editMode ? "Редактировать" : dict[currentLang].createGroup; document.getElementById('submit-group-btn').textContent = editMode ? dict[currentLang].saveBtn : dict[currentLang].createGroupBtn; if (editMode) { document.getElementById('group-type-selector').style.display = 'none'; document.getElementById('group-id-wrapper').style.display = 'none'; document.getElementById('group-members-wrapper').style.display = 'none'; document.getElementById('group-name-input').value = viewingEntityData.name; document.getElementById('group-desc-input').value = viewingEntityData.description; currentGroupAvatarBase64 = viewingEntityData.avatar; currentGroupBgBase64 = viewingEntityData.profileBg; document.getElementById('group-color-input').value = viewingEntityData.profileColor || '#8774e1'; document.getElementById('group-avatar-preview').style.backgroundImage = currentGroupAvatarBase64 ? `url(${currentGroupAvatarBase64})` : 'none'; document.getElementById('group-bg-preview').style.backgroundImage = currentGroupBgBase64 ? `url(${currentGroupBgBase64})` : 'none'; document.getElementById('group-bg-preview').style.backgroundSize = 'cover'; } else { document.getElementById('group-type-selector').style.display = 'flex'; document.getElementById('group-id-wrapper').style.display = 'flex'; document.getElementById('group-members-wrapper').style.display = 'flex'; document.getElementById('group-id-input').value = ''; document.getElementById('group-name-input').value = ''; document.getElementById('group-desc-input').value = ''; document.getElementById('group-color-input').value = '#8774e1'; document.getElementById('group-avatar-preview').style.backgroundImage = 'none'; document.getElementById('group-bg-preview').style.backgroundImage = 'none'; currentGroupAvatarBase64 = null; currentGroupBgBase64 = null; const list = document.getElementById('group-members-list'); list.innerHTML = ''; const res = await fetch('/my-full-profile'); const data = await res.json(); if (data.contacts && data.contacts.length > 0) { for (let contact of data.contacts) { const cUsername = typeof contact === 'object' ? contact.username : contact; const cName = typeof contact === 'object' && contact.customName ? contact.customName : cUsername; list.innerHTML += `<label class="member-option"><span>${cName} (@${cUsername})</span><input type="checkbox" value="${cUsername}"></label>`; } } else { list.innerHTML = `<div style="padding: 10px; color: var(--text-dim); font-size: 0.85rem;">Нет контактов для добавления</div>`; } } modal.classList.remove('hidden'); setTimeout(() => modal.classList.add('show'), 10); } else { modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); } }
-    function openEditGroupModal() { toggleCreateGroupModal(true, true); }
-    function previewGroupAvatar(input) { const file = input.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { currentGroupAvatarBase64 = e.target.result; document.getElementById('group-avatar-preview').style.backgroundImage = `url(${currentGroupAvatarBase64})`; }; reader.readAsDataURL(file); }
-    function previewGroupBg(input) { const file = input.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { currentGroupBgBase64 = e.target.result; document.getElementById('group-bg-preview').style.backgroundImage = `url(${currentGroupBgBase64})`; document.getElementById('group-bg-preview').style.backgroundSize = 'cover'; }; reader.readAsDataURL(file); }
-    function submitCreateGroup() { const name = document.getElementById('group-name-input').value.trim(); const desc = document.getElementById('group-desc-input').value.trim(); const color = document.getElementById('group-color-input').value; if (editModeGroupId) { if(!name) { showToast("Укажите название"); return; } socket.emit('update_group_info', { id: editModeGroupId, name: name, description: desc, avatar: currentGroupAvatarBase64, profileBg: currentGroupBgBase64, profileColor: color }); toggleCreateGroupModal(false); showToast("Изменения сохранены"); return; } const id = document.getElementById('group-id-input').value.trim(); const type = document.querySelector('input[name="chat-type"]:checked').value; if (!id || !name) { showToast("Укажите ID и Название"); return; } const checkboxes = document.querySelectorAll('#group-members-list input[type="checkbox"]:checked'); const members = Array.from(checkboxes).map(cb => cb.value); if (members.length > 99) { showToast("Максимум 99 участников (плюс вы)"); return; } socket.emit('create_group', { id: id, type: type, name: name, description: desc, avatar: currentGroupAvatarBase64, profileBg: currentGroupBgBase64, profileColor: color, members: members }); }
-
-    function startReply(username, text) { replyData = { username, text }; document.getElementById('reply-user').innerText = '↩ ' + username; document.getElementById('reply-text').innerText = text; document.getElementById('reply-preview').classList.remove('hidden'); msgInput.focus(); }
-    function cancelReply() { replyData = null; document.getElementById('reply-preview').classList.add('hidden'); }
-    function applySavedPreferences() { const theme = localStorage.getItem('aura-theme') || 'dark'; const pattern = localStorage.getItem('aura-pattern') || 'none'; const lang = localStorage.getItem('aura-lang') || 'ru'; const glass = localStorage.getItem('aura-glass') || 'off'; changeTheme(theme); changePattern(pattern); changeLanguage(lang); changeGlassEffect(glass); document.getElementById('theme-select').value = theme; document.getElementById('pattern-select').value = pattern; document.getElementById('lang-select').value = lang; document.getElementById('glass-select').value = glass; if(currentUser && currentUser.profilePattern) document.getElementById('profile-pattern-select').value = currentUser.profilePattern; }
-    function changeTheme(themeName) { document.documentElement.setAttribute('data-theme', themeName); localStorage.setItem('aura-theme', themeName); }
-    function changePattern(p) { document.getElementById('app-body').className = `pattern-${p}`; localStorage.setItem('aura-pattern', p); }
-    function changeGlassEffect(state) { if (state === 'on') { document.documentElement.setAttribute('data-glass', 'on'); document.getElementById('liquid-bg').classList.remove('hidden'); } else { document.documentElement.removeAttribute('data-glass'); document.getElementById('liquid-bg').classList.add('hidden'); } localStorage.setItem('aura-glass', state); }
-    async function changeProfilePattern(p) { document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${p}`; await fetch('/update-profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ profilePattern: p }) }); if(currentUser) currentUser.profilePattern = p; }
-    function toggleSettings(show) { document.getElementById('settings-drawer').classList.toggle('active', show); }
-    function toggleProfileModal(show) { const modal = document.getElementById('profile-modal'); if (show) { modal.classList.remove('hidden'); setTimeout(() => modal.classList.add('show'), 10); } else { modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); } }
-    function closeProfile(e) { if (e.target.id === 'profile-modal') toggleProfileModal(false); }
-    function closeModalOnOuterClick(e, modalId) { if (e.target.id === modalId) { const modal = document.getElementById(modalId); modal.classList.remove('show'); setTimeout(() => modal.classList.add('hidden'), 300); } }
-    function switchSettingsTab(tabId) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); const btn = document.querySelector(`.tab-btn[onclick="switchSettingsTab('${tabId}')"]`); const content = document.getElementById(`tab-${tabId}`); if(btn) btn.classList.add('active'); if(content) content.classList.add('active'); }
+    function kickMember(groupId, userId) { 
+        if(confirm("Удалить пользователя из сообщества?")) {
+            socket.emit('kick_member', { groupId, userId }); 
+        }
+    }
     
-    // --- ЛОГИКА КАСТОМНЫХ ГОЛОСОВЫХ СООБЩЕНИЙ ---
+    function toggleContact() { 
+        if(!viewingUserProfile || (viewingEntityData && viewingEntityData.type !== 'user')) return; 
+        
+        const isContact = document.getElementById('p-icon-contact').className.includes('user-minus'); 
+        
+        if (isContact) {
+            socket.emit('toggle_contact', {username: viewingUserProfile, remove: true}); 
+        } else { 
+            document.getElementById('contact-custom-name').value = document.getElementById('p-name').textContent; 
+            document.getElementById('custom-contact-modal').classList.remove('hidden'); 
+            setTimeout(() => document.getElementById('custom-contact-modal').classList.add('show'), 10); 
+        } 
+    }
+    
+    function saveContact() { 
+        socket.emit('toggle_contact', {username: viewingUserProfile, customName: document.getElementById('contact-custom-name').value.trim()}); 
+        closeModalOnOuterClick({target: {id: 'custom-contact-modal'}}, 'custom-contact-modal'); 
+    }
+    
+    function toggleBlock() { 
+        if(viewingUserProfile && viewingEntityData && viewingEntityData.type === 'user') {
+            socket.emit('toggle_block', {username: viewingUserProfile}); 
+        }
+    }
+    
+    function leaveGroup() { 
+        if(viewingUserProfile && viewingEntityData && viewingEntityData.type !== 'user') { 
+            if(confirm("Вы уверены, что хотите покинуть?")) { 
+                socket.emit('leave_group', { groupId: viewingUserProfile }); 
+                toggleProfileModal(false); 
+                
+                if(selectedChatId === viewingUserProfile) { 
+                    document.getElementById('chat-ui').classList.add('hidden'); 
+                    document.getElementById('welcome-screen').classList.remove('hidden'); 
+                } 
+            } 
+        } 
+    }
+    
+    function updateProfileContactBtn(inContacts) { 
+        const icon = document.getElementById('p-icon-contact'); 
+        const text = document.getElementById('p-text-contact'); 
+        
+        if (inContacts) { 
+            icon.className = 'fas fa-user-minus'; 
+            text.textContent = dict[currentLang].removeContact; 
+        } else { 
+            icon.className = 'fas fa-user-plus'; 
+            text.textContent = dict[currentLang].addContact; 
+        } 
+    }
+    
+    function updateProfileBlockBtn(isBlocked) { 
+        const icon = document.querySelector('#p-btn-block i'); 
+        const text = document.getElementById('p-text-block'); 
+        const btn = document.getElementById('p-btn-block'); 
+        
+        if (isBlocked) { 
+            icon.className = 'fas fa-unlock'; 
+            text.textContent = dict[currentLang].unblockUser; 
+            btn.classList.remove('block-btn'); 
+            btn.style.color = '#4CAF50'; 
+        } else { 
+            icon.className = 'fas fa-ban'; 
+            text.textContent = dict[currentLang].blockUser; 
+            btn.classList.add('block-btn'); 
+            btn.style.color = '#ff3b30'; 
+        } 
+    }
+
+    async function toggleCreateGroupModal(show, editMode = false) { 
+        const modal = document.getElementById('create-group-modal'); 
+        
+        if (show) { 
+            editModeGroupId = editMode ? viewingEntityData.id : null; 
+            document.getElementById('modal-group-title').textContent = editMode ? "Редактировать" : dict[currentLang].createGroup; 
+            document.getElementById('submit-group-btn').textContent = editMode ? dict[currentLang].saveBtn : dict[currentLang].createGroupBtn; 
+            
+            if (editMode) { 
+                document.getElementById('group-type-selector').style.display = 'none'; 
+                document.getElementById('group-id-wrapper').style.display = 'none'; 
+                document.getElementById('group-members-wrapper').style.display = 'none'; 
+                
+                document.getElementById('group-name-input').value = viewingEntityData.name; 
+                document.getElementById('group-desc-input').value = viewingEntityData.description; 
+                currentGroupAvatarBase64 = viewingEntityData.avatar; 
+                currentGroupBgBase64 = viewingEntityData.profileBg; 
+                
+                document.getElementById('group-color-input').value = viewingEntityData.profileColor || '#8774e1'; 
+                
+                document.getElementById('group-avatar-preview').style.backgroundImage = currentGroupAvatarBase64 ? `url(${currentGroupAvatarBase64})` : 'none'; 
+                document.getElementById('group-bg-preview').style.backgroundImage = currentGroupBgBase64 ? `url(${currentGroupBgBase64})` : 'none'; 
+                document.getElementById('group-bg-preview').style.backgroundSize = 'cover'; 
+            } else { 
+                document.getElementById('group-type-selector').style.display = 'flex'; 
+                document.getElementById('group-id-wrapper').style.display = 'flex'; 
+                document.getElementById('group-members-wrapper').style.display = 'flex'; 
+                
+                document.getElementById('group-id-input').value = ''; 
+                document.getElementById('group-name-input').value = ''; 
+                document.getElementById('group-desc-input').value = ''; 
+                document.getElementById('group-color-input').value = '#8774e1'; 
+                
+                document.getElementById('group-avatar-preview').style.backgroundImage = 'none'; 
+                document.getElementById('group-bg-preview').style.backgroundImage = 'none'; 
+                
+                currentGroupAvatarBase64 = null; 
+                currentGroupBgBase64 = null; 
+                
+                const list = document.getElementById('group-members-list'); 
+                list.innerHTML = ''; 
+                
+                const res = await fetch('/my-full-profile'); 
+                const data = await res.json(); 
+                
+                if (data.contacts && data.contacts.length > 0) { 
+                    for (let contact of data.contacts) { 
+                        const cUsername = typeof contact === 'object' ? contact.username : contact; 
+                        const cName = typeof contact === 'object' && contact.customName ? contact.customName : cUsername; 
+                        list.innerHTML += `<label class="member-option"><span>${cName} (@${cUsername})</span><input type="checkbox" value="${cUsername}"></label>`; 
+                    } 
+                } else { 
+                    list.innerHTML = `<div style="padding: 10px; color: var(--text-dim); font-size: 0.85rem;">Нет контактов для добавления</div>`; 
+                } 
+            } 
+            
+            modal.classList.remove('hidden'); 
+            setTimeout(() => modal.classList.add('show'), 10); 
+        } else { 
+            modal.classList.remove('show'); 
+            setTimeout(() => modal.classList.add('hidden'), 300); 
+        } 
+    }
+    
+    function openEditGroupModal() { 
+        toggleCreateGroupModal(true, true); 
+    }
+    
+    function previewGroupAvatar(input) { 
+        const file = input.files[0]; 
+        if (!file) return; 
+        
+        const reader = new FileReader(); 
+        reader.onload = (e) => { 
+            currentGroupAvatarBase64 = e.target.result; 
+            document.getElementById('group-avatar-preview').style.backgroundImage = `url(${currentGroupAvatarBase64})`; 
+        }; 
+        reader.readAsDataURL(file); 
+    }
+    
+    function previewGroupBg(input) { 
+        const file = input.files[0]; 
+        if (!file) return; 
+        
+        const reader = new FileReader(); 
+        reader.onload = (e) => { 
+            currentGroupBgBase64 = e.target.result; 
+            document.getElementById('group-bg-preview').style.backgroundImage = `url(${currentGroupBgBase64})`; 
+            document.getElementById('group-bg-preview').style.backgroundSize = 'cover'; 
+        }; 
+        reader.readAsDataURL(file); 
+    }
+    
+    function submitCreateGroup() { 
+        const name = document.getElementById('group-name-input').value.trim(); 
+        const desc = document.getElementById('group-desc-input').value.trim(); 
+        const color = document.getElementById('group-color-input').value; 
+        
+        if (editModeGroupId) { 
+            if(!name) { 
+                showToast("Укажите название"); 
+                return; 
+            } 
+            
+            socket.emit('update_group_info', { id: editModeGroupId, name: name, description: desc, avatar: currentGroupAvatarBase64, profileBg: currentGroupBgBase64, profileColor: color }); 
+            toggleCreateGroupModal(false); 
+            showToast("Изменения сохранены"); 
+            return; 
+        } 
+        
+        const id = document.getElementById('group-id-input').value.trim(); 
+        const type = document.querySelector('input[name="chat-type"]:checked').value; 
+        
+        if (!id || !name) { 
+            showToast("Укажите ID и Название"); 
+            return; 
+        } 
+        
+        const checkboxes = document.querySelectorAll('#group-members-list input[type="checkbox"]:checked'); 
+        const members = Array.from(checkboxes).map(cb => cb.value); 
+        
+        if (members.length > 99) { 
+            showToast("Максимум 99 участников (плюс вы)"); 
+            return; 
+        } 
+        
+        socket.emit('create_group', { id: id, type: type, name: name, description: desc, avatar: currentGroupAvatarBase64, profileBg: currentGroupBgBase64, profileColor: color, members: members }); 
+    }
+
+    function startReply(username, text) { 
+        replyData = { username, text }; 
+        document.getElementById('reply-user').innerText = '↩ ' + username; 
+        document.getElementById('reply-text').innerText = text; 
+        document.getElementById('reply-preview').classList.remove('hidden'); 
+        msgInput.focus(); 
+    }
+    
+    function cancelReply() { 
+        replyData = null; 
+        document.getElementById('reply-preview').classList.add('hidden'); 
+    }
+    
+    function applySavedPreferences() { 
+        const theme = localStorage.getItem('aura-theme') || 'dark'; 
+        const pattern = localStorage.getItem('aura-pattern') || 'none'; 
+        const lang = localStorage.getItem('aura-lang') || 'ru'; 
+        const glass = localStorage.getItem('aura-glass') || 'off'; 
+        
+        changeTheme(theme); 
+        changePattern(pattern); 
+        changeLanguage(lang); 
+        changeGlassEffect(glass); 
+        
+        const themeSel = document.getElementById('theme-select');
+        if (themeSel) themeSel.value = theme;
+        
+        const glassSel = document.getElementById('glass-select');
+        if (glassSel) glassSel.value = glass;
+        
+        if (currentUser && currentUser.profilePattern) {
+            const patSel = document.getElementById('profile-pattern-select');
+            if (patSel) patSel.value = currentUser.profilePattern;
+        }
+    }
+    
+    function changeTheme(themeName) { 
+        document.documentElement.setAttribute('data-theme', themeName); 
+        localStorage.setItem('aura-theme', themeName); 
+    }
+    
+    function changePattern(p) { 
+        document.getElementById('app-body').className = `pattern-${p}`; 
+        localStorage.setItem('aura-pattern', p); 
+    }
+    
+    function changeGlassEffect(state) { 
+        if (state === 'on') { 
+            document.documentElement.setAttribute('data-glass', 'on'); 
+            document.getElementById('liquid-bg').classList.remove('hidden'); 
+        } else { 
+            document.documentElement.removeAttribute('data-glass'); 
+            document.getElementById('liquid-bg').classList.add('hidden'); 
+        } 
+        localStorage.setItem('aura-glass', state); 
+    }
+    
+    async function changeProfilePattern(p) { 
+        document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${p}`; 
+        await fetch('/update-profile', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({ profilePattern: p }) 
+        }); 
+        if(currentUser) currentUser.profilePattern = p; 
+    }
+    
+    function toggleSettings(show) { 
+        document.getElementById('settings-drawer').classList.toggle('active', show); 
+    }
+    
+    function toggleProfileModal(show) { 
+        const modal = document.getElementById('profile-modal'); 
+        if (show) { 
+            modal.classList.remove('hidden'); 
+            setTimeout(() => modal.classList.add('show'), 10); 
+        } else { 
+            modal.classList.remove('show'); 
+            setTimeout(() => modal.classList.add('hidden'), 300); 
+        } 
+    }
+    
+    function closeProfile(e) { 
+        if (e.target.id === 'profile-modal') toggleProfileModal(false); 
+    }
+    
+    function closeModalOnOuterClick(e, modalId) { 
+        if (e.target.id === modalId) { 
+            const modal = document.getElementById(modalId); 
+            modal.classList.remove('show'); 
+            setTimeout(() => modal.classList.add('hidden'), 300); 
+        } 
+    }
+    
+    function switchSettingsTab(tabId) { 
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); 
+        
+        const btn = document.querySelector(`.tab-btn[onclick="switchSettingsTab('${tabId}')"]`); 
+        const content = document.getElementById(`tab-${tabId}`); 
+        
+        if(btn) btn.classList.add('active'); 
+        if(content) content.classList.add('active'); 
+    }
+
+    function switchMobileTab(tabId, btnElement) {
+        document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(btn => btn.classList.remove('active'));
+        if (btnElement) btnElement.classList.add('active');
+        
+        if (tabId === 'settings') {
+            toggleSettings(true);
+            document.getElementById('main-container').classList.remove('chat-open');
+        } else {
+            toggleSettings(false);
+            if (tabId === 'chats') {
+                document.getElementById('main-container').classList.remove('chat-open');
+            } else if (tabId === 'contacts') {
+                document.getElementById('main-container').classList.remove('chat-open');
+            } else if (tabId === 'calls') {
+                document.getElementById('main-container').classList.remove('chat-open');
+            }
+        }
+    }
+    
     let currentPlayingAudio = null;
-    function toggleCustomAudio(audioId) { const audio = document.getElementById(audioId); const icon = document.getElementById('icon-' + audioId); if (!audio) return; if (audio.paused) { if (currentPlayingAudio && currentPlayingAudio !== audio) { currentPlayingAudio.pause(); const oldIcon = document.getElementById('icon-' + currentPlayingAudio.id); if(oldIcon) oldIcon.className = 'fas fa-play'; } audio.play(); icon.className = 'fas fa-pause'; currentPlayingAudio = audio; } else { audio.pause(); icon.className = 'fas fa-play'; currentPlayingAudio = null; } }
-    function updateAudioProgress(audioId) { const audio = document.getElementById(audioId); const progress = document.getElementById('progress-' + audioId); const timeDisplay = document.getElementById('time-' + audioId); if (audio && audio.duration && audio.duration !== Infinity) { const percent = (audio.currentTime / audio.duration) * 100; if(progress) progress.style.width = percent + '%'; const mins = Math.floor(audio.currentTime / 60); const secs = Math.floor(audio.currentTime % 60); if(timeDisplay) timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; } }
-    function setAudioDuration(audioId) { const audio = document.getElementById(audioId); const timeDisplay = document.getElementById('time-' + audioId); if (audio && audio.duration && audio.duration !== Infinity) { const mins = Math.floor(audio.duration / 60); const secs = Math.floor(audio.duration % 60); if(timeDisplay) timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; } }
-    function resetAudio(audioId) { const icon = document.getElementById('icon-' + audioId); const progress = document.getElementById('progress-' + audioId); if(icon) icon.className = 'fas fa-play'; if(progress) progress.style.width = '0%'; setAudioDuration(audioId); if(currentPlayingAudio && currentPlayingAudio.id === audioId) currentPlayingAudio = null; }
-    function seekCustomAudio(e, audioId) { const audio = document.getElementById(audioId); if (!audio) return; const container = e.currentTarget; const rect = container.getBoundingClientRect(); const clickX = e.clientX - rect.left; const percent = clickX / rect.width; if(audio.duration && audio.duration !== Infinity) { audio.currentTime = percent * audio.duration; updateAudioProgress(audioId); } }
+    
+    function toggleCustomAudio(audioId) { 
+        const audio = document.getElementById(audioId); 
+        const icon = document.getElementById('icon-' + audioId); 
+        
+        if (!audio) return; 
+        
+        if (audio.paused) { 
+            if (currentPlayingAudio && currentPlayingAudio !== audio) { 
+                currentPlayingAudio.pause(); 
+                const oldIcon = document.getElementById('icon-' + currentPlayingAudio.id); 
+                if(oldIcon) oldIcon.className = 'fas fa-play'; 
+            } 
+            audio.play(); 
+            icon.className = 'fas fa-pause'; 
+            currentPlayingAudio = audio; 
+        } else { 
+            audio.pause(); 
+            icon.className = 'fas fa-play'; 
+            currentPlayingAudio = null; 
+        } 
+    }
+    
+    function updateAudioProgress(audioId) { 
+        const audio = document.getElementById(audioId); 
+        const progress = document.getElementById('progress-' + audioId); 
+        const timeDisplay = document.getElementById('time-' + audioId); 
+        
+        if (audio && audio.duration && audio.duration !== Infinity) { 
+            const percent = (audio.currentTime / audio.duration) * 100; 
+            if(progress) progress.style.width = percent + '%'; 
+            
+            const mins = Math.floor(audio.currentTime / 60); 
+            const secs = Math.floor(audio.currentTime % 60); 
+            if(timeDisplay) timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; 
+        } 
+    }
+    
+    function setAudioDuration(audioId) { 
+        const audio = document.getElementById(audioId); 
+        const timeDisplay = document.getElementById('time-' + audioId); 
+        
+        if (audio && audio.duration && audio.duration !== Infinity) { 
+            const mins = Math.floor(audio.duration / 60); 
+            const secs = Math.floor(audio.duration % 60); 
+            if(timeDisplay) timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; 
+        } 
+    }
+    
+    function resetAudio(audioId) { 
+        const icon = document.getElementById('icon-' + audioId); 
+        const progress = document.getElementById('progress-' + audioId); 
+        
+        if(icon) icon.className = 'fas fa-play'; 
+        if(progress) progress.style.width = '0%'; 
+        
+        setAudioDuration(audioId); 
+        if(currentPlayingAudio && currentPlayingAudio.id === audioId) currentPlayingAudio = null; 
+    }
+    
+    function seekCustomAudio(e, audioId) { 
+        const audio = document.getElementById(audioId); 
+        if (!audio) return; 
+        
+        const container = e.currentTarget; 
+        const rect = container.getBoundingClientRect(); 
+        const clickX = e.clientX - rect.left; 
+        const percent = clickX / rect.width; 
+        
+        if(audio.duration && audio.duration !== Infinity) { 
+            audio.currentTime = percent * audio.duration; 
+            updateAudioProgress(audioId); 
+        } 
+    }
 
     sendBtn.onclick = send; 
-    msgInput.onkeypress = (e) => { if(e.key === 'Enter') send(); };
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+    msgInput.onkeypress = (e) => { 
+        if(e.key === 'Enter') send(); 
+    };
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+    }
 </script>
 </body>
 </html>
