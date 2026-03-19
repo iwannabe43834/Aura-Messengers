@@ -143,7 +143,10 @@ async function initDB() {
             isEdited INTEGER DEFAULT 0,
             isPinned INTEGER DEFAULT 0,
             reactions TEXT,
-            deletedFor TEXT
+            deletedFor TEXT,
+            views TEXT DEFAULT '[]',
+            isChannelPost INTEGER DEFAULT 0,
+            isSystem INTEGER DEFAULT 0
         )
     `);
 
@@ -156,7 +159,6 @@ async function initDB() {
         )
     `);
 
-    // ТАБЛИЦА ДЛЯ ИСТОРИЙ С ПРОСМОТРАМИ И РЕАКЦИЯМИ
     await db.exec(`
         CREATE TABLE IF NOT EXISTS stories (
             id TEXT PRIMARY KEY,
@@ -170,9 +172,11 @@ async function initDB() {
         )
     `);
 
-    // Безопасное обновление старой базы историй, если она уже была создана
     try { await db.exec(`ALTER TABLE stories ADD COLUMN views TEXT DEFAULT '[]'`); } catch(e){}
     try { await db.exec(`ALTER TABLE stories ADD COLUMN reactions TEXT DEFAULT '{}'`); } catch(e){}
+    try { await db.exec(`ALTER TABLE messages ADD COLUMN views TEXT DEFAULT '[]'`); } catch(e){}
+    try { await db.exec(`ALTER TABLE messages ADD COLUMN isChannelPost INTEGER DEFAULT 0`); } catch(e){}
+    try { await db.exec(`ALTER TABLE messages ADD COLUMN isSystem INTEGER DEFAULT 0`); } catch(e){}
 
     console.log("✅ База данных SQLite успешно инициализирована!");
 }
@@ -420,11 +424,15 @@ app.get('/my-full-profile', (req, res) => {
 
 app.post('/update-profile', (req, res) => {
     const sessionUser = req.session.username || req.headers['x-user-id'];
-    if (!sessionUser) return res.status(401).json({ error: 'Not logged in' });
+    if (!sessionUser) {
+        return res.status(401).json({ error: 'Not logged in' });
+    }
     
     const users = readData(USERS_FILE);
     const user = users[sessionUser];
-    if (!user) return res.status(404).json({ error: 'Not found' });
+    if (!user) {
+        return res.status(404).json({ error: 'Not found' });
+    }
     
     if (req.body.name !== undefined) user.name = req.body.name;
     if (req.body.bio !== undefined) user.bio = req.body.bio;
@@ -438,16 +446,13 @@ app.post('/update-profile', (req, res) => {
     
     writeData(USERS_FILE, users);
 
-    // Безопасно отдаем обновленного юзера (username теперь точно есть)
     const safeUser = { username: sessionUser, ...user };
     delete safeUser.password;
-
     io.emit('user_updated', { username: sessionUser, user: safeUser });
     
     res.json({ success: true });
 });
 
-// --- ЧТЕНИЕ ПРОФИЛЕЙ С УЧЕТОМ ПРИВАТНОСТИ И ГРУПП ---
 app.get('/api/entity/:id', (req, res) => {
     const callerId = req.session.username || req.headers['x-user-id'];
     const id = req.params.id;
@@ -457,8 +462,16 @@ app.get('/api/entity/:id', (req, res) => {
 
     if (groups[id]) {
         const group = groups[id];
+        let myRole = 'member';
+        
+        if (group.creator === callerId) {
+            myRole = 'creator';
+        } else if (group.admins && group.admins[callerId]) {
+            myRole = 'admin';
+        }
+
         return res.json({
-            type: 'group', 
+            type: group.type || 'group',
             id: group.id, 
             name: group.name, 
             displayName: group.name,
@@ -468,14 +481,20 @@ app.get('/api/entity/:id', (req, res) => {
             profileColor: group.profileColor,
             emojiStatus: group.emojiStatus,
             membersCount: group.members.length,
-            isCreator: group.creator === callerId, 
+            isCreator: group.creator === callerId,
+            myRole: myRole,
+            admins: group.admins || {},
+            muted: group.muted || {},
+            inviteHash: group.inviteHash || null,
             isOnline: false, 
             lastSeen: null, 
             membersList: group.members.map(m => ({
                 username: m,
                 name: users[m] ? users[m].name : m,
                 avatar: users[m] ? users[m].avatar : null,
-                emojiStatus: users[m] ? users[m].emojiStatus : ''
+                emojiStatus: users[m] ? users[m].emojiStatus : '',
+                role: group.creator === m ? 'creator' : (group.admins && group.admins[m] ? 'admin' : 'member'),
+                customTitle: (group.admins && group.admins[m] && group.admins[m].title) ? group.admins[m].title : ''
             }))
         });
     }
@@ -617,6 +636,12 @@ io.on('connection', (socket) => {
         socket.emit('my_chats_list', chatsArray);
     });
 
+    socket.on('get_call_history', async () => {
+        if (!currentUsername) return;
+        const rows = await db.all(`SELECT * FROM messages WHERE (fromUser = ? OR toUser = ?) AND text LIKE '%system-call-msg%' ORDER BY id DESC LIMIT 50`, [currentUsername, currentUsername]);
+        socket.emit('call_history_data', rows);
+    });
+
     socket.on('get_history', async (data) => {
         if (!currentUsername) return;
         const chatWith = data.chatWith;
@@ -650,9 +675,22 @@ io.on('connection', (socket) => {
 
             let fromDisplayName = r.fromUser;
             let emojiStatus = '';
+            let isAdmin = false;
+            let customTitle = '';
             
             if (users[r.fromUser]) {
                 emojiStatus = users[r.fromUser].emojiStatus || '';
+            }
+
+            if (groups[chatWith]) {
+                const g = groups[chatWith];
+                if (g.creator === r.fromUser) {
+                    isAdmin = true;
+                    customTitle = 'Создатель';
+                } else if (g.admins && g.admins[r.fromUser]) {
+                    isAdmin = true;
+                    customTitle = g.admins[r.fromUser].title || 'Админ';
+                }
             }
 
             if (r.fromUser !== currentUsername && groups[chatWith]) {
@@ -677,7 +715,12 @@ io.on('connection', (socket) => {
                 reactions: r.reactions ? JSON.parse(r.reactions) : {},
                 deletedFor: deletedFor,
                 fromDisplayName: fromDisplayName,
-                emojiStatus: emojiStatus
+                emojiStatus: emojiStatus,
+                isChannelPost: r.isChannelPost === 1,
+                isSystem: r.isSystem === 1,
+                views: r.views ? JSON.parse(r.views) : [],
+                isAdmin: isAdmin,
+                customTitle: customTitle
             };
         }).filter(m => m !== null);
 
@@ -705,7 +748,8 @@ io.on('connection', (socket) => {
             text: r.text, 
             time: r.time, 
             read: r.isRead === 1, 
-            isEdited: r.isEdited === 1
+            isEdited: r.isEdited === 1,
+            isSystem: r.isSystem === 1
         }));
         
         socket.emit('chat_history', { history, offset: 0, chatWith: data.chatWith, isSearch: true });
@@ -714,12 +758,52 @@ io.on('connection', (socket) => {
     socket.on('private_msg', async (data) => {
         if (!currentUsername) return;
         
+        const groups = readData(GROUPS_FILE);
+
+        if (groups[data.to]) {
+            const g = groups[data.to];
+            if (g.muted && g.muted[currentUsername]) {
+                if (Date.now() < g.muted[currentUsername]) {
+                    socket.emit('error_msg', 'Вы временно заглушены в этом чате модератором.');
+                    return;
+                } else {
+                    delete g.muted[currentUsername];
+                    writeData(GROUPS_FILE, groups);
+                }
+            }
+            
+            if (g.type === 'channel' && g.creator !== currentUsername) {
+                if (!g.admins || !g.admins[currentUsername]) {
+                    socket.emit('error_msg', 'В канал могут писать только администраторы.');
+                    return; 
+                }
+            }
+        }
+
         const msgId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
         let finalMediaData = null;
         
         if (data.media && data.media.data && data.media.data.startsWith('data:')) {
             finalMediaData = saveBase64ToFile(data.media.data, data.media.name);
             data.media.data = finalMediaData;
+        }
+
+        let isChannelPost = false;
+        let customTitle = '';
+        let isAdmin = false;
+        
+        if (groups[data.to]) {
+            const g = groups[data.to];
+            if (g.type === 'channel') {
+                isChannelPost = true;
+            }
+            if (g.creator === currentUsername) {
+                isAdmin = true;
+                customTitle = 'Создатель';
+            } else if (g.admins && g.admins[currentUsername]) {
+                isAdmin = true;
+                customTitle = g.admins[currentUsername].title || 'Админ';
+            }
         }
 
         const msg = {
@@ -733,24 +817,30 @@ io.on('connection', (socket) => {
             read: false, 
             reactions: {}, 
             isEdited: false, 
-            deletedFor: []
+            deletedFor: [],
+            isChannelPost: isChannelPost,
+            isSystem: false,
+            views: isChannelPost ? [currentUsername] : [],
+            isAdmin: isAdmin,
+            customTitle: customTitle
         };
 
         await db.run(`INSERT INTO messages 
-            (id, fromUser, toUser, text, mediaType, mediaData, mediaName, replyData, time, isRead, isEdited, isPinned, reactions, deletedFor) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '{}', '[]')`,
+            (id, fromUser, toUser, text, mediaType, mediaData, mediaName, replyData, time, isRead, isEdited, isPinned, reactions, deletedFor, views, isChannelPost, isSystem) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '{}', '[]', ?, ?, 0)`,
             [
                 msg.id, msg.from, msg.to, msg.text,
                 msg.media ? msg.media.type : null,
                 msg.media ? msg.media.data : null,
                 msg.media ? msg.media.name : null,
                 msg.reply ? JSON.stringify(msg.reply) : null,
-                msg.time
+                msg.time,
+                JSON.stringify(msg.views),
+                isChannelPost ? 1 : 0
             ]
         );
 
         const users = readData(USERS_FILE);
-        const groups = readData(GROUPS_FILE);
         const myUser = users[currentUsername];
         
         msg.emojiStatus = myUser.emojiStatus || '';
@@ -785,6 +875,19 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('view_channel_msg', async (data) => {
+        if (!currentUsername) return;
+        const msg = await db.get('SELECT views FROM messages WHERE id = ? AND isChannelPost = 1', [data.id]);
+        if (msg) {
+            let views = JSON.parse(msg.views || '[]');
+            if (!views.includes(currentUsername)) {
+                views.push(currentUsername);
+                await db.run('UPDATE messages SET views = ? WHERE id = ?', [JSON.stringify(views), data.id]);
+                io.emit('msg_views_update', { id: data.id, views: views.length });
+            }
+        }
+    });
+
     socket.on('edit_msg', async (data) => {
         if (!currentUsername) return;
         await db.run(`UPDATE messages SET text = ?, isEdited = 1 WHERE id = ? AND fromUser = ?`, [data.text, data.id, currentUsername]);
@@ -793,9 +896,25 @@ io.on('connection', (socket) => {
 
     socket.on('pin_msg', async (data) => {
         if (!currentUsername) return;
+        const groups = readData(GROUPS_FILE);
+        
+        if (groups[data.chatId]) {
+            const g = groups[data.chatId];
+            if (g.creator !== currentUsername && (!g.admins || !g.admins[currentUsername])) {
+                socket.emit('error_msg', 'Только администраторы могут закреплять сообщения');
+                return;
+            }
+        }
+
         await db.run(`UPDATE messages SET isPinned = 0 WHERE toUser = ?`, [data.chatId]);
         await db.run(`UPDATE messages SET isPinned = 1 WHERE id = ?`, [data.id]);
         io.emit('msg_pinned', { id: data.id, text: data.text, chatId: data.chatId });
+
+        const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.chatId, 'закрепил(а) сообщение', timeStr]);
+        io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.chatId, text: 'закрепил(а) сообщение', time: timeStr, isSystem: true, isChannelPost: false });
     });
 
     socket.on('mark_read', async (data) => {
@@ -817,35 +936,35 @@ io.on('connection', (socket) => {
 
     socket.on('typing', (data) => {
         const groups = readData(GROUPS_FILE);
-        if (groups[data.to]) {
+        if (groups[data.to] && groups[data.to].type !== 'channel') {
             groups[data.to].members.forEach(member => {
                 if (member !== currentUsername && onlineUsers[member]) {
                     io.to(onlineUsers[member]).emit('user_typing', { from: currentUsername, to: data.to });
                 }
             });
-        } else if (onlineUsers[data.to]) {
+        } else if (onlineUsers[data.to] && !groups[data.to]) {
             io.to(onlineUsers[data.to]).emit('user_typing', { from: currentUsername, to: currentUsername });
         }
     });
 
     socket.on('stop_typing', (data) => {
         const groups = readData(GROUPS_FILE);
-        if (groups[data.to]) {
+        if (groups[data.to] && groups[data.to].type !== 'channel') {
             groups[data.to].members.forEach(member => {
                 if (member !== currentUsername && onlineUsers[member]) {
                     io.to(onlineUsers[member]).emit('user_stop_typing', { from: currentUsername, to: data.to });
                 }
             });
-        } else if (onlineUsers[data.to]) {
+        } else if (onlineUsers[data.to] && !groups[data.to]) {
             io.to(onlineUsers[data.to]).emit('user_stop_typing', { from: currentUsername, to: currentUsername });
         }
     });
 
-    // --- ЛОГИКА ИСТОРИЙ (STORIES) С ПРОСМОТРАМИ И РЕАКЦИЯМИ ---
+    // --- ЛОГИКА ИСТОРИЙ (STORIES) ---
     socket.on('upload_story', async (data) => {
         if (!currentUsername) return;
         const id = Date.now().toString();
-        const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 часа
+        const expiresAt = Date.now() + 24 * 60 * 60 * 1000; 
         
         let finalMediaData = null;
         if (data.mediaData.startsWith('data:')) {
@@ -867,10 +986,8 @@ io.on('connection', (socket) => {
             reactions: {}
         };
 
-        // Отправляем автору
         socket.emit('new_story', storyObj);
 
-        // Рассылаем ТОЛЬКО контактам и тем, с кем есть чат
         for (let otherUser in onlineUsers) {
             if (otherUser === currentUsername) continue;
             
@@ -881,7 +998,9 @@ io.on('connection', (socket) => {
                 canSee = true;
             } else {
                 const hasChat = await db.get(`SELECT id FROM messages WHERE (fromUser=? AND toUser=?) OR (fromUser=? AND toUser=?) LIMIT 1`, [currentUsername, otherUser, otherUser, currentUsername]);
-                if (hasChat) canSee = true;
+                if (hasChat) {
+                    canSee = true;
+                }
             }
             
             if (canSee) {
@@ -893,13 +1012,11 @@ io.on('connection', (socket) => {
     socket.on('get_stories', async () => {
         if (!currentUsername) return;
         
-        // Удаляем старые истории
         await db.run('DELETE FROM stories WHERE expiresAt < ?', [Date.now()]);
         
         const users = readData(USERS_FILE);
         const myUser = users[currentUsername];
         
-        // Список тех, чьи истории мы можем видеть
         let allowedAuthors = new Set();
         allowedAuthors.add(currentUsername); 
         
@@ -939,7 +1056,6 @@ io.on('connection', (socket) => {
             if (!views.includes(currentUsername)) {
                 views.push(currentUsername);
                 await db.run('UPDATE stories SET views = ? WHERE id = ?', [JSON.stringify(views), data.id]);
-                // Оповещаем автора, если он онлайн
                 if (onlineUsers[story.username]) {
                     io.to(onlineUsers[story.username]).emit('story_viewed', { id: data.id, viewer: currentUsername });
                 }
@@ -955,7 +1071,6 @@ io.on('connection', (socket) => {
             reactions[currentUsername] = data.emoji;
             await db.run('UPDATE stories SET reactions = ? WHERE id = ?', [JSON.stringify(reactions), data.id]);
             
-            // Если автор онлайн, отправляем ему реакцию
             if (onlineUsers[story.username]) {
                 io.to(onlineUsers[story.username]).emit('story_reaction_received', { id: data.id, from: currentUsername, emoji: data.emoji });
             }
@@ -1008,11 +1123,10 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- ОБНОВЛЕНИЕ ГРУПП (Для кастомизации) ---
     socket.on('update_group_info', (data) => {
         if (!currentUsername) return;
         const groups = readData(GROUPS_FILE);
-        if (groups[data.id] && groups[data.id].creator === currentUsername) {
+        if (groups[data.id] && (groups[data.id].creator === currentUsername || (groups[data.id].admins && groups[data.id].admins[currentUsername]))) {
             if (data.name) groups[data.id].name = data.name;
             if (data.description !== undefined) groups[data.id].description = data.description;
             if (data.avatar !== undefined) groups[data.id].avatar = data.avatar;
@@ -1024,13 +1138,102 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('create_group', (data) => {
+    // АДМИН ПАНЕЛЬ: Выдача прав
+    socket.on('promote_admin', (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE); 
+        const groups = readData(GROUPS_FILE);
+        const g = groups[data.groupId];
+        if (g && g.creator === currentUsername) {
+            if (!g.admins) {
+                g.admins = {};
+            }
+            g.admins[data.userId] = { title: data.title || 'Админ' };
+            writeData(GROUPS_FILE, groups);
+            io.emit('group_updated', { groupId: data.groupId });
+        }
+    });
+
+    socket.on('demote_admin', (data) => {
+        if (!currentUsername) return;
+        const groups = readData(GROUPS_FILE);
+        const g = groups[data.groupId];
+        if (g && g.creator === currentUsername && g.admins) {
+            delete g.admins[data.userId];
+            writeData(GROUPS_FILE, groups);
+            io.emit('group_updated', { groupId: data.groupId });
+        }
+    });
+
+    socket.on('mute_user', (data) => {
+        if (!currentUsername) return;
+        const groups = readData(GROUPS_FILE);
+        const g = groups[data.groupId];
+        if (g && (g.creator === currentUsername || (g.admins && g.admins[currentUsername]))) {
+            if (g.creator === data.userId) return; // Нельзя замутить создателя
+            if (!g.muted) {
+                g.muted = {};
+            }
+            g.muted[data.userId] = Date.now() + (data.hours * 60 * 60 * 1000);
+            writeData(GROUPS_FILE, groups);
+            io.emit('group_updated', { groupId: data.groupId });
+        }
+    });
+
+    // ГЕНЕРАЦИЯ ИНВАЙТ ССЫЛОК
+    socket.on('generate_invite_link', (data) => {
+        if (!currentUsername) return;
+        const groups = readData(GROUPS_FILE);
+        const g = groups[data.groupId];
+        if (g && (g.creator === currentUsername || (g.admins && g.admins[currentUsername]))) {
+            const hash = Math.random().toString(36).substr(2, 10);
+            g.inviteHash = hash;
+            writeData(GROUPS_FILE, groups);
+            socket.emit('invite_link_generated', { groupId: data.groupId, hash: hash });
+        }
+    });
+
+    // ВХОД ПО ИНВАЙТ ССЫЛКЕ
+    socket.on('join_by_hash', async (data) => {
+        if (!currentUsername) return;
+        const groups = readData(GROUPS_FILE);
+        let targetGroup = null;
+        
+        for (let g in groups) {
+            if (groups[g].inviteHash === data.hash) { 
+                targetGroup = groups[g]; 
+                break; 
+            }
+        }
+        
+        if (targetGroup) {
+            if (!targetGroup.members.includes(currentUsername)) {
+                targetGroup.members.push(currentUsername);
+                writeData(GROUPS_FILE, groups);
+
+                const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, targetGroup.id, 'присоединился(лась) к чату по ссылке', timeStr]);
+                io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: targetGroup.id, text: 'присоединился(лась) к чату по ссылке', time: timeStr, isSystem: true, isChannelPost: false });
+                
+                socket.emit('group_joined_success', { groupId: targetGroup.id });
+                socket.emit('get_my_chats');
+                io.emit('group_updated', { groupId: targetGroup.id });
+            } else {
+                socket.emit('group_joined_success', { groupId: targetGroup.id }); 
+            }
+        } else {
+            socket.emit('error_msg', 'Ссылка недействительна или устарела');
+        }
+    });
+
+    socket.on('create_group', async (data) => {
+        if (!currentUsername) return;
+        const groups = readData(GROUPS_FILE);
         const users = readData(USERS_FILE);
         
         if (groups[data.id]) { 
-            socket.emit('error', 'Группа с таким ID уже существует'); 
+            socket.emit('error_msg', 'Группа с таким ID уже существует'); 
             return; 
         }
 
@@ -1052,19 +1255,29 @@ io.on('connection', (socket) => {
         let members = [...new Set(allowedMembers)].slice(0, 100);
         groups[data.id] = { 
             id: data.id, 
+            type: data.type || 'group', 
             name: data.name, 
             description: data.description || '', 
             avatar: data.avatar || null, 
             profileBg: data.profileBg || null,
-            profileColor: data.profileColor || 'var(--primary)',
-            emojiStatus: data.emojiStatus || '',
+            profileColor: data.profileColor || 'var(--primary)', 
+            emojiStatus: data.emojiStatus || '', 
             creator: currentUsername, 
-            members: members 
+            members: members,
+            admins: {}, 
+            muted: {}
         };
         
         writeData(GROUPS_FILE, groups);
         socket.emit('group_created', { groupId: data.id });
+
+        const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
+        const sysText = `создал(а) ${data.type === 'channel' ? 'канал' : 'группу'} "${data.name}"`;
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
+        await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.id, sysText, timeStr]);
+        io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.id, text: sysText, time: timeStr, isSystem: true, isChannelPost: false });
+
         members.forEach(member => { 
             if (member !== currentUsername && onlineUsers[member]) {
                 io.to(onlineUsers[member]).emit('search_result', { exists: true, username: data.id }); 
@@ -1072,35 +1285,22 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on('leave_group', (data) => {
+    socket.on('leave_group', async (data) => {
         if (!currentUsername) return;
         const groups = readData(GROUPS_FILE);
         if (groups[data.groupId]) {
             groups[data.groupId].members = groups[data.groupId].members.filter(m => m !== currentUsername);
+            
+            const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.groupId, 'покинул(а) чат', timeStr]);
+            io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.groupId, text: 'покинул(а) чат', time: timeStr, isSystem: true, isChannelPost: false });
+
             if (groups[data.groupId].members.length === 0) {
                 delete groups[data.groupId];
             }
             writeData(GROUPS_FILE, groups);
             socket.emit('get_my_chats');
-        }
-    });
-
-    socket.on('add_reaction', async (data) => {
-        if (!currentUsername) return;
-        const row = await db.get(`SELECT reactions FROM messages WHERE id = ?`, [data.id]);
-        if (row) {
-            let reactions = row.reactions ? JSON.parse(row.reactions) : {};
-            reactions[data.emoji] = reactions[data.emoji] || [];
-            
-            const userIdx = reactions[data.emoji].indexOf(currentUsername);
-            if (userIdx > -1) {
-                reactions[data.emoji].splice(userIdx, 1); 
-            } else {
-                reactions[data.emoji].push(currentUsername);
-            }
-            
-            await db.run(`UPDATE messages SET reactions = ? WHERE id = ?`, [JSON.stringify(reactions), data.id]);
-            io.emit('msg_reaction_update', { id: data.id, reactions: reactions });
         }
     });
 
@@ -1112,7 +1312,16 @@ io.on('connection', (socket) => {
         if (msg) {
             const recipient = msg.toUser === currentUsername ? msg.fromUser : msg.toUser;
             
-            if (data.forEveryone && msg.fromUser === currentUsername) {
+            // Проверка прав на удаление ЧУЖОГО сообщения в группе
+            let hasAdminRights = false;
+            if (groups[recipient] && msg.fromUser !== currentUsername) {
+                const g = groups[recipient];
+                if (g.creator === currentUsername || (g.admins && g.admins[currentUsername])) {
+                    hasAdminRights = true;
+                }
+            }
+
+            if ((data.forEveryone && msg.fromUser === currentUsername) || hasAdminRights) {
                 await db.run(`DELETE FROM messages WHERE id = ?`, [data.id]);
                 if (groups[recipient]) { 
                     groups[recipient].members.forEach(member => { 
@@ -1137,12 +1346,23 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('kick_member', (data) => {
+    socket.on('kick_member', async (data) => {
         if (!currentUsername) return;
         const groups = readData(GROUPS_FILE);
-        if (groups[data.groupId] && groups[data.groupId].creator === currentUsername) {
-            groups[data.groupId].members = groups[data.groupId].members.filter(m => m !== data.userId);
+        const g = groups[data.groupId];
+        
+        if (g && (g.creator === currentUsername || (g.admins && g.admins[currentUsername]))) {
+            if (g.creator === data.userId) return; // Нельзя кикнуть создателя
+
+            g.members = g.members.filter(m => m !== data.userId);
             writeData(GROUPS_FILE, groups);
+            
+            const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.groupId, `исключил(а) пользователя @${data.userId}`, timeStr]);
+            io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.groupId, text: `исключил(а) пользователя @${data.userId}`, time: timeStr, isSystem: true, isChannelPost: false });
+
             io.emit('group_updated', { groupId: data.groupId });
             if (onlineUsers[data.userId]) {
                 io.to(onlineUsers[data.userId]).emit('kicked_from_group', { groupId: data.groupId });
@@ -1190,6 +1410,22 @@ const peerServer = ExpressPeerServer(server, {
 });
 app.use('/peerjs', peerServer);
 
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Сервер запущен на порту ${PORT}. Telegram бот и сервер звонков активны.`);
+// --- ОБРАБОТКА КОРОТКИХ ССЫЛОК И ИНВАЙТОВ В САМОМ НИЗУ ---
+app.get('/join/:hash', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/:id', (req, res, next) => {
+    const id = req.params.id;
+    const reserved = ['api', 'socket.io', 'uploads', 'peerjs', 'join', 'auth.html', 'index.html', 'manifest.json', 'style.css', 'sw.js', 'favicon.ico'];
+    
+    if (id.includes('.') || reserved.includes(id)) {
+        return next();
+    }
+    
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+server.listen(PORT, '0.0.0.0', () => { 
+    console.log(`🚀 Сервер запущен на порту ${PORT}.`); 
 });
