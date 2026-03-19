@@ -2,7 +2,6 @@
 <html lang="ru">
 <head>
     <script>
-        // Сохраняем куда юзер пытался зайти до авторизации (для коротких ссылок и инвайтов)
         if (!localStorage.getItem('username')) {
             if (window.location.pathname.length > 1) {
                 localStorage.setItem('redirect_after_login', window.location.pathname);
@@ -13,12 +12,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Aura Messenger</title>
+    
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#8774e1">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <link rel="stylesheet" href="/style.css?v=13">
+    <link rel="stylesheet" href="/style.css?v=16">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script src="/socket.io/socket.io.js"></script>
@@ -32,7 +32,11 @@
             padding: 2px 6px;
             border-radius: 12px;
             box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
         }
+        
         .header-menu-btn {
             background: none;
             border: none;
@@ -42,6 +46,7 @@
             padding: 5px 10px;
             transition: color 0.2s;
         }
+        
         .header-menu-btn:hover {
             color: var(--primary);
         }
@@ -52,9 +57,11 @@
             flex: 1; 
             overflow: hidden; 
         }
+        
         .mobile-tab-content.hidden { 
             display: none !important; 
         }
+        
         .empty-state { 
             padding: 40px 20px; 
             text-align: center; 
@@ -66,6 +73,7 @@
             gap: 15px; 
             margin: auto 0;
         }
+        
         .empty-state i { 
             font-size: 3rem; 
             opacity: 0.5; 
@@ -76,6 +84,7 @@
             text-decoration: underline; 
             word-break: break-all; 
         }
+        
         .chat-mention { 
             color: var(--primary); 
             cursor: pointer; 
@@ -86,8 +95,225 @@
             transition: 0.2s; 
             display: inline-block; 
         }
+        
         .chat-mention:hover { 
             background: rgba(135, 116, 225, 0.3); 
+        }
+
+        /* --- RAVE (КИНОЗАЛ) ПОИСК И СТИЛИ --- */
+        .rave-container {
+            width: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid var(--border);
+            z-index: 11;
+            flex-shrink: 0;
+        }
+        
+        .rave-video-wrapper {
+            position: relative;
+            width: 100%;
+            max-height: 40vh;
+            aspect-ratio: 16/9;
+            background: #05050a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .rave-placeholder {
+            text-align: center;
+            color: var(--text-dim);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .rave-placeholder i { 
+            font-size: 3rem; 
+            opacity: 0.5; 
+        }
+        
+        .rave-host-controls {
+            padding: 15px;
+            background: var(--bg-sidebar);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .rave-input-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        .rave-select, .rave-input {
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg-main);
+            color: white;
+            outline: none;
+            font-size: 0.95rem;
+        }
+        
+        .rave-select { cursor: pointer; }
+        .rave-input { flex: 1; }
+        
+        .rave-playback-controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .rave-ctrl-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        .rave-ctrl-btn:hover { 
+            background: rgba(255,255,255,0.2); 
+            transform: scale(1.1); 
+        }
+        
+        .rave-ctrl-btn.sync { 
+            width: auto; 
+            border-radius: 14px; 
+            padding: 0 20px; 
+            color: var(--primary); 
+            font-weight: bold; 
+            background: var(--primary-soft); 
+            gap: 10px;
+        }
+        
+        .rave-ctrl-btn.sync:hover { 
+            background: rgba(135, 116, 225, 0.3); 
+        }
+
+        /* Стиль сетки результатов поиска Rave */
+        .rave-search-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+            max-height: 350px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .rave-search-results::-webkit-scrollbar { width: 6px; }
+        .rave-search-results::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .rave-search-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .rave-search-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-color: var(--primary);
+        }
+
+        .rave-search-thumb {
+            width: 100%;
+            aspect-ratio: 16/9;
+            position: relative;
+            background: #000;
+        }
+
+        .rave-search-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .rave-search-duration {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            font-size: 0.75rem;
+            padding: 3px 6px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .rave-search-info {
+            padding: 10px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .rave-search-title {
+    font-size: 0.9rem;
+    color: white;
+    font-weight: bold;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2; /* <--- ДОБАВЬ ЭТУ СТРОЧКУ */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 5px;
+    line-height: 1.3;
+}
+
+        .rave-search-author {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-top-buttons { 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+        }
+        
+        .btn-rave-create { 
+            color: #ff3b30 !important; 
+            background: rgba(255, 59, 48, 0.1); 
+            border-radius: 12px; 
+            padding: 8px 14px; 
+            font-size: 1rem; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            cursor: pointer; 
+            border: none;
+            font-weight: bold;
+            transition: all 0.2s var(--spring-soft);
+        }
+        
+        .btn-rave-create:hover { 
+            background: rgba(255, 59, 48, 0.2); 
+            transform: translateY(-2px); 
         }
     </style>
 </head>
@@ -327,6 +553,7 @@
             <div class="type-selector" id="group-type-selector">
                 <input type="radio" id="type-group" name="chat-type" value="group" checked>
                 <label for="type-group" data-i18n="typeGroup">Группа</label>
+                
                 <input type="radio" id="type-channel" name="chat-type" value="channel">
                 <label for="type-channel" data-i18n="typeChannel">Канал</label>
             </div>
@@ -365,7 +592,46 @@
                 <div class="members-select-list" id="group-members-list"></div>
             </div>
             <div style="padding: 0 20px; margin-top: 10px;">
-                <button class="primary-btn-small" id="submit-group-btn" style="width: 100%;" onclick="submitCreateGroup()" data-i18n="createGroupBtn">Создать</button>
+                <button class="primary-btn-small" id="submit-group-btn" style="width: 100%;" onclick="submitCreateGroup('group')" data-i18n="createGroupBtn">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-rave-modal" class="modal hidden" onclick="closeModalOnOuterClick(event, 'create-rave-modal')" style="z-index: 2100;">
+        <div class="modal-content tg-style-profile" style="padding: 20px 0; max-height: 90vh; overflow-y: auto;">
+            <div class="profile-header-actions">
+                <button class="close-profile-btn" onclick="toggleCreateRaveModal(false)">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="profile-main-info">
+                <h2>Создать Кинозал 🍿</h2>
+                <p style="color: #ff3b30; font-size: 0.8rem; margin-top: 5px;">⚠️ Максимум 10 участников</p>
+            </div>
+            <input type="file" id="rave-avatar-input" style="display:none" accept="image/*" onchange="previewRaveAvatar(this)">
+            <input type="file" id="rave-bg-input" style="display:none" accept="image/*" onchange="previewRaveBg(this)">
+            <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 15px;">
+                <div class="group-avatar-upload" id="rave-avatar-preview" onclick="document.getElementById('rave-avatar-input').click()" title="Аватар">
+                    <i class="fas fa-camera"></i>
+                </div>
+                <div class="group-avatar-upload" id="rave-bg-preview" onclick="document.getElementById('rave-bg-input').click()" style="border-radius: 12px; border-style: dashed;" title="Обложка">
+                    <i class="fas fa-image"></i>
+                </div>
+            </div>
+            <div class="modal-form-group">
+                <label>ИДЕНТИФИКАТОР (@)</label>
+                <input type="text" id="rave-id-input" placeholder="movie_night">
+            </div>
+            <div class="modal-form-group">
+                <label>НАЗВАНИЕ КИНОЗАЛА</label>
+                <input type="text" id="rave-name-input" placeholder="Смотрим Шрека">
+            </div>
+            <div class="modal-form-group">
+                <label>ПРИГЛАСИТЬ ДРУЗЕЙ</label>
+                <div class="members-select-list" id="rave-members-list"></div>
+            </div>
+            <div style="padding: 0 20px; margin-top: 10px;">
+                <button class="primary-btn-small" style="width: 100%; background: linear-gradient(45deg, #ff0054, #3a0ca3);" onclick="submitCreateRave()">Создать Кинозал</button>
             </div>
         </div>
     </div>
@@ -467,6 +733,8 @@
                             <option value="ocean">Океан</option>
                             <option value="sunset">Закат</option>
                             <option value="neon">Неон</option>
+                            <option value="forest">Лес</option>
+                            <option value="cyberpunk">Cyberpunk</option>
                         </select>
                     </div>
                     <div class="settings-input-group">
@@ -526,9 +794,14 @@
                 </button>
                 <h2 id="logo-text">Aura</h2>
                 <div style="flex:1"></div>
-                <button class="menu-btn" onclick="toggleCreateGroupModal(true)" title="Создать">
-                    <i class="fas fa-pen-to-square"></i>
-                </button>
+                <div class="header-top-buttons">
+                    <button class="btn-rave-create" onclick="toggleCreateRaveModal(true)" title="Создать Кинозал">
+                        <i class="fas fa-film"></i> Rave
+                    </button>
+                    <button class="menu-btn" onclick="toggleCreateGroupModal(true)" title="Создать чат">
+                        <i class="fas fa-pen-to-square"></i>
+                    </button>
+                </div>
             </div>
             <div class="search-wrapper">
                 <i class="fas fa-search"></i>
@@ -653,6 +926,49 @@
                 <div style="flex: 1; overflow: hidden;">
                     <div style="color: var(--primary); font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">Закрепленное сообщение</div>
                     <div id="pinned-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 0.9rem; color: var(--text-main);"></div>
+                </div>
+            </div>
+
+            <div id="rave-container" class="rave-container hidden">
+                <div class="rave-video-wrapper" id="rave-video-wrapper">
+                    <div id="rave-placeholder" class="rave-placeholder">
+                        <i class="fas fa-film"></i>
+                        <p>Кинозал готов. Ждем видео от хоста...</p>
+                    </div>
+                    <video id="rave-html-player" class="hidden" style="width:100%; height:100%;" controls playsinline></video>
+                    <div id="rave-iframe-container" class="hidden" style="width:100%; height:100%;"></div>
+                </div>
+                
+                <div id="rave-host-controls" class="rave-host-controls hidden">
+                    <span id="rave-host-status" style="color: #4ade80; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px;">
+                        <i class="fas fa-crown"></i> Вы управляете видео (Хост)
+                    </span>
+                    <div class="rave-input-group">
+                        <select id="rave-source-type" class="rave-select">
+                            <option value="youtube">YouTube</option>
+                            <option value="vk">VK Видео</option>
+                            <option value="rutube">RuTube</option>
+                            <option value="direct">Прямая ссылка (.mp4)</option>
+                        </select>
+                        <input type="text" id="rave-url-input" placeholder="Поиск видео или ссылка..." class="rave-input" onkeypress="if(event.key === 'Enter') searchRaveVideo()">
+                        <button onclick="searchRaveVideo()" class="primary-btn-small" style="margin: 0; width: auto; border-radius: 12px; padding: 0 20px;">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+
+                    <div id="rave-search-results" class="rave-search-results hidden"></div>
+
+                    <div class="rave-playback-controls">
+                        <button onclick="raveHostAction('play')" class="rave-ctrl-btn">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button onclick="raveHostAction('pause')" class="rave-ctrl-btn">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button onclick="raveHostAction('sync')" class="rave-ctrl-btn sync">
+                            <i class="fas fa-sync"></i> Синхрон
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1047,6 +1363,208 @@
         }
     }
 
+    /* === ЛОГИКА RAVE (КИНОЗАЛА) - ПОИСК И ВОСПРОИЗВЕДЕНИЕ === */
+    let currentRaveState = null;
+    
+    function searchRaveVideo() {
+        const query = document.getElementById('rave-url-input').value.trim();
+        const platform = document.getElementById('rave-source-type').value;
+        
+        if (!query) return;
+
+        // Если это прямая ссылка (начинается с http), то просто включаем её, а не ищем
+        if (query.startsWith('http')) {
+            setRaveVideoDirect(query, platform);
+            return;
+        }
+
+        // Иначе отправляем запрос на поиск на сервер
+        const resultsContainer = document.getElementById('rave-search-results');
+        resultsContainer.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-dim);"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Ищем видео...</p></div>';
+        resultsContainer.classList.remove('hidden');
+        
+        socket.emit('rave_search_video', { platform: platform, query: query });
+    }
+
+    // Слушаем результаты поиска от сервера
+    socket.on('rave_search_results', (data) => {
+        const container = document.getElementById('rave-search-results');
+        container.innerHTML = '';
+        
+        if (!data.results || data.results.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-dim);"><i class="fas fa-search-minus fa-2x"></i><p style="margin-top:10px;">Ничего не найдено</p></div>';
+            return;
+        }
+
+        let html = '';
+        data.results.forEach(v => {
+            // Формируем embed URL в зависимости от платформы
+            let embedUrl = '';
+            if (data.platform === 'youtube') {
+                embedUrl = `https://www.youtube.com/embed/${v.id}?autoplay=1&enablejsapi=1`;
+            } else {
+                embedUrl = v.url; // Для других платформ берем как есть
+            }
+            
+            html += `
+                <div class="rave-search-card" onclick="setRaveVideoDirect('${embedUrl}', '${data.platform}')">
+                    <div class="rave-search-thumb">
+                        <img src="${v.thumbnail}" alt="Thumbnail">
+                        <span class="rave-search-duration">${v.duration}</span>
+                    </div>
+                    <div class="rave-search-info">
+                        <div class="rave-search-title">${v.title}</div>
+                        <div class="rave-search-author">${v.author}</div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    });
+
+    // Функция для прямого запуска видео (когда кликнули на карточку поиска или вставили прямую ссылку)
+    function setRaveVideoDirect(url, typeSelect) {
+        let videoType = 'direct';
+        let finalUrl = url;
+        
+        if (typeSelect === 'youtube') {
+            videoType = 'youtube';
+            if (url.includes('<iframe') && url.includes('src="')) {
+                const match = url.match(/src="([^"]+)"/);
+                if (match && match[1]) finalUrl = match[1];
+            } else {
+                try {
+                    const videoId = url.includes('youtu.be/') ? url.split('youtu.be/')[1].split('?')[0] : new URLSearchParams(new URL(url).search).get('v');
+                    if (videoId) finalUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+                } catch(e) {}
+            }
+        } else if (typeSelect === 'vk') {
+            videoType = 'vk';
+            if (url.includes('<iframe') && url.includes('src="')) {
+                const match = url.match(/src="([^"]+)"/);
+                if (match && match[1]) finalUrl = match[1];
+            } else if (!url.includes('video_ext.php')) {
+                showToast('Для ВК нужна ссылка для встраивания (Экспорт -> код iframe)');
+                return;
+            }
+        } else if (typeSelect === 'rutube') {
+            videoType = 'rutube';
+            if (url.includes('<iframe') && url.includes('src="')) {
+                const match = url.match(/src="([^"]+)"/);
+                if (match && match[1]) finalUrl = match[1];
+            } else if (url.includes('rutube.ru/video/')) {
+                const match = url.match(/rutube\.ru\/video\/([a-zA-Z0-9]+)/);
+                if (match && match[1]) {
+                    finalUrl = `https://rutube.ru/play/embed/${match[1]}`;
+                }
+            } else if (!url.includes('/play/embed/')) {
+                showToast('Вставьте обычную ссылку на видео RuTube');
+                return;
+            }
+        }
+        
+        // Отправляем сигнал на запуск
+        socket.emit('rave_update_state', { action: 'set_video', groupId: selectedChatId, videoUrl: finalUrl, videoType: videoType });
+        
+        // Очищаем и скрываем поиск
+        document.getElementById('rave-url-input').value = '';
+        document.getElementById('rave-search-results').classList.add('hidden');
+    }
+
+    function applyRaveState(state) {
+        if (!state) return;
+        currentRaveState = state;
+        
+        const vidHtml = document.getElementById('rave-html-player');
+        const vidIframe = document.getElementById('rave-iframe-container');
+        const placeholder = document.getElementById('rave-placeholder');
+        
+        if (state.host === currentUser.username) {
+            document.getElementById('rave-host-controls').classList.remove('hidden');
+            document.getElementById('rave-host-status').innerHTML = '<i class="fas fa-crown"></i> Вы управляете видео (Хост)';
+        } else {
+            document.getElementById('rave-host-controls').classList.add('hidden');
+            document.getElementById('rave-search-results').classList.add('hidden'); // Зрителям поиск не нужен
+        }
+
+        if (!state.videoUrl) {
+            vidHtml.classList.add('hidden');
+            vidIframe.classList.add('hidden');
+            placeholder.classList.remove('hidden');
+            return;
+        }
+
+        placeholder.classList.add('hidden');
+
+        if (state.videoType === 'direct' || state.videoUrl.endsWith('.mp4')) {
+            vidIframe.classList.add('hidden');
+            vidHtml.classList.remove('hidden');
+            
+            if (vidHtml.src !== state.videoUrl) {
+                vidHtml.src = state.videoUrl;
+                vidHtml.currentTime = state.currentTime;
+            }
+            
+            if (state.isPlaying && vidHtml.paused) {
+                vidHtml.play().catch(()=>{});
+            } else if (!state.isPlaying && !vidHtml.paused) {
+                vidHtml.pause();
+            }
+        } else {
+            vidHtml.classList.add('hidden');
+            vidIframe.classList.remove('hidden');
+            
+            if (vidIframe.innerHTML.indexOf(state.videoUrl) === -1) {
+                vidIframe.innerHTML = `<iframe src="${state.videoUrl}" frameborder="0" allow="autoplay; fullscreen" style="width:100%; height:100%; border:none;"></iframe>`;
+            }
+        }
+    }
+    
+    function raveHostAction(action) {
+        const vid = document.getElementById('rave-html-player');
+        if (action === 'play') {
+            socket.emit('rave_update_state', { action: 'play', groupId: selectedChatId, currentTime: vid.currentTime });
+        } else if (action === 'pause') {
+            socket.emit('rave_update_state', { action: 'pause', groupId: selectedChatId, currentTime: vid.currentTime });
+        } else if (action === 'sync') {
+            socket.emit('rave_update_state', { action: 'seek', groupId: selectedChatId, currentTime: vid.currentTime });
+        }
+    }
+
+    socket.on('rave_state_updated', (data) => {
+        if (selectedChatId === data.groupId) {
+            applyRaveState(data.state);
+        }
+    });
+
+    socket.on('rave_sync_request', (data) => {
+        if (selectedChatId === data.groupId && currentRaveState && currentRaveState.host === currentUser.username) {
+            const vid = document.getElementById('rave-html-player');
+            socket.emit('rave_update_state', { 
+                action: 'sync_response', 
+                groupId: data.groupId, 
+                requester: data.requester, 
+                currentTime: vid.currentTime, 
+                isPlaying: !vid.paused 
+            });
+        }
+    });
+
+    socket.on('rave_sync_response', (data) => {
+        if (selectedChatId === data.groupId) {
+            const vid = document.getElementById('rave-html-player');
+            if (Math.abs(vid.currentTime - data.currentTime) > 1.5) {
+                vid.currentTime = data.currentTime;
+            }
+            if (data.isPlaying && vid.paused) {
+                vid.play().catch(()=>{});
+            } else if (!data.isPlaying && !vid.paused) {
+                vid.pause();
+            }
+        }
+    });
+
+    // --- ИСТОРИИ (STORIES) ---
     let storiesData = [];
     let currentStoryViewerIndex = 0;
     let viewingStoriesList = [];
@@ -1462,14 +1980,12 @@
                 await Notification.requestPermission();
             }
 
-            // КОРОТКИЕ ССЫЛКИ И ИНВАЙТЫ
             let targetPath = localStorage.getItem('redirect_after_login') || window.location.pathname;
             localStorage.removeItem('redirect_after_login');
 
             if (targetPath.length > 1 && !targetPath.startsWith('/join/')) {
                 const targetId = targetPath.substring(1);
                 
-                // ИГНОРИРУЕМ СИСТЕМНЫЕ ФАЙЛЫ И ПУТИ
                 const reservedPaths = ['index.html', 'auth.html', 'manifest.json', 'style.css', 'sw.js', 'favicon.ico'];
                 
                 if (!reservedPaths.includes(targetId) && !targetId.includes('.')) {
@@ -1560,11 +2076,12 @@
             document.getElementById('btn-call-audio').style.display = 'none'; 
             document.getElementById('btn-call-video').style.display = 'none'; 
             document.getElementById('btn-call-screen').style.display = 'none';
+            document.getElementById('rave-container').classList.add('hidden');
         } else {
             const res = await fetch(`/api/entity/${chatId}`); 
             const data = await res.json(); 
             
-            isCurrentChatGroup = (data.type === 'group' || data.type === 'channel'); 
+            isCurrentChatGroup = (data.type === 'group' || data.type === 'channel' || data.type === 'rave'); 
             let emojiHtml = data.emojiStatus ? `<span class="emoji-status-badge">${data.emojiStatus}</span>` : '';
             
             document.getElementById('chat-with-title').innerHTML = `${data.displayName || data.name || chatId} ${emojiHtml}`; 
@@ -1585,6 +2102,23 @@
                 headerAvatar.style.backgroundImage = 'none'; 
                 headerAvatar.style.background = data.profileColor || 'var(--primary)'; 
                 headerAvatar.textContent = (data.displayName || data.name || chatId)[0].toUpperCase(); 
+            }
+
+            if (data.type === 'rave') {
+                document.getElementById('rave-container').classList.remove('hidden');
+                
+                if (data.raveState) {
+                    applyRaveState(data.raveState);
+                }
+                
+                if (data.raveState && data.raveState.host !== currentUser.username) {
+                    socket.emit('rave_update_state', { action: 'sync_request', groupId: chatId });
+                }
+            } else {
+                document.getElementById('rave-container').classList.add('hidden');
+                const vid = document.getElementById('rave-html-player');
+                vid.pause();
+                vid.src = '';
             }
 
             if (data.type === 'channel' && data.myRole === 'member') { 
@@ -1742,7 +2276,6 @@
         return html; 
     }
 
-    // --- ПАРСИНГ ССЫЛОК И УПОМИНАНИЙ ---
     function formatText(text) {
         if (!text) return '';
         if (text.includes('<span class="system-call-msg">')) {
@@ -1751,10 +2284,8 @@
         
         let s = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         
-        // Ссылки
         s = s.replace(/(https?:\/\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+)/g, '<a href="$1" target="_blank" class="chat-link" onclick="event.stopPropagation()">$1</a>');
         
-        // Упоминания @username
         s = s.replace(/@([a-zA-Z0-9_]+)/g, '<span class="chat-mention" onclick="viewUserProfile(\'$1\'); event.stopPropagation();">@$1</span>');
         
         return s;
@@ -2288,6 +2819,7 @@
     socket.on('group_created', (data) => { 
         showToast(dict[currentLang].groupCreated); 
         toggleCreateGroupModal(false); 
+        toggleCreateRaveModal(false); 
         socket.emit('get_my_chats'); 
         openChat(data.groupId); 
     });
@@ -2547,7 +3079,7 @@
         document.getElementById('p-name').innerHTML = `${data.displayName || data.name || chatId} ${emojiHtml}`; 
         document.getElementById('p-username').textContent = '@' + chatId; 
         document.getElementById('p-bio').textContent = data.bio || data.description || dict[currentLang].notSpecified; 
-        document.getElementById('p-bio-label').textContent = (data.type === 'group' || data.type === 'channel') ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
+        document.getElementById('p-bio-label').textContent = (data.type === 'group' || data.type === 'channel' || data.type === 'rave') ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
         
         const pAvatar = document.getElementById('p-avatar'); 
         
@@ -2592,8 +3124,8 @@
             } 
         };
         
-        if (data.type === 'group' || data.type === 'channel') { 
-            document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()} (${data.type === 'channel' ? dict[currentLang].typeChannel : dict[currentLang].typeGroup})`; 
+        if (data.type === 'group' || data.type === 'channel' || data.type === 'rave') { 
+            document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()} (${data.type === 'channel' ? dict[currentLang].typeChannel : (data.type === 'rave' ? 'Кинозал Rave' : dict[currentLang].typeGroup)})`; 
             document.getElementById('p-row-birthday').classList.add('hidden'); 
             
             showField('p-row-location', null); 
@@ -2633,7 +3165,6 @@
                 mList.innerHTML = `<button class="primary-btn-small" onclick="socket.emit('generate_invite_link', {groupId: '${data.id}'})" style="margin-bottom:10px;"><i class="fas fa-link"></i> Создать ссылку-приглашение</button>` + mList.innerHTML; 
             }
             
-            // НОВАЯ КРАСИВАЯ КНОПКА ССЫЛКИ С КНОПКОЙ СКОПИРОВАТЬ
             if (data.inviteHash && data.myRole === 'creator') { 
                 const inviteLink = window.location.origin + '/join/' + data.inviteHash;
                 mList.innerHTML = `
@@ -2836,6 +3367,47 @@
         } 
     }
     
+    async function toggleCreateRaveModal(show) { 
+        const modal = document.getElementById('create-rave-modal'); 
+        
+        if (show) { 
+            document.getElementById('rave-id-input').value = ''; 
+            document.getElementById('rave-name-input').value = ''; 
+            
+            document.getElementById('rave-avatar-preview').style.backgroundImage = 'none'; 
+            document.getElementById('rave-bg-preview').style.backgroundImage = 'none'; 
+            
+            currentGroupAvatarBase64 = null; 
+            currentGroupBgBase64 = null; 
+            
+            const list = document.getElementById('rave-members-list'); 
+            list.innerHTML = ''; 
+            
+            const res = await fetch('/my-full-profile'); 
+            const data = await res.json(); 
+            
+            if (data.contacts && data.contacts.length > 0) { 
+                for (let contact of data.contacts) { 
+                    const cUsername = typeof contact === 'object' ? contact.username : contact; 
+                    const cName = typeof contact === 'object' && contact.customName ? contact.customName : cUsername; 
+                    list.innerHTML += `<label class="member-option"><span>${cName} (@${cUsername})</span><input type="checkbox" value="${cUsername}"></label>`; 
+                } 
+            } else { 
+                list.innerHTML = `<div style="padding: 10px; color: var(--text-dim); font-size: 0.85rem;">Нет контактов для добавления</div>`; 
+            } 
+            
+            modal.classList.remove('hidden'); 
+            setTimeout(() => {
+                modal.classList.add('show');
+            }, 10); 
+        } else { 
+            modal.classList.remove('show'); 
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300); 
+        } 
+    }
+
     function openEditGroupModal() { 
         toggleCreateGroupModal(true, true); 
     }
@@ -2861,6 +3433,31 @@
             currentGroupBgBase64 = e.target.result; 
             document.getElementById('group-bg-preview').style.backgroundImage = `url(${currentGroupBgBase64})`; 
             document.getElementById('group-bg-preview').style.backgroundSize = 'cover'; 
+        }; 
+        reader.readAsDataURL(file); 
+    }
+    
+    function previewRaveAvatar(input) { 
+        const file = input.files[0]; 
+        if (!file) return; 
+        
+        const reader = new FileReader(); 
+        reader.onload = (e) => { 
+            currentGroupAvatarBase64 = e.target.result; 
+            document.getElementById('rave-avatar-preview').style.backgroundImage = `url(${currentGroupAvatarBase64})`; 
+        }; 
+        reader.readAsDataURL(file); 
+    }
+    
+    function previewRaveBg(input) { 
+        const file = input.files[0]; 
+        if (!file) return; 
+        
+        const reader = new FileReader(); 
+        reader.onload = (e) => { 
+            currentGroupBgBase64 = e.target.result; 
+            document.getElementById('rave-bg-preview').style.backgroundImage = `url(${currentGroupBgBase64})`; 
+            document.getElementById('rave-bg-preview').style.backgroundSize = 'cover'; 
         }; 
         reader.readAsDataURL(file); 
     }
@@ -2901,10 +3498,13 @@
         const checkboxes = document.querySelectorAll('#group-members-list input[type="checkbox"]:checked'); 
         const members = Array.from(checkboxes).map(cb => cb.value); 
         
-        if (members.length > 99) { 
+        if (type === 'rave' && members.length > 9) { 
+            showToast("Максимум 10 участников в кинозале (включая вас)"); 
+            return; 
+        } else if (members.length > 99) {
             showToast("Максимум 99 участников (плюс вы)"); 
             return; 
-        } 
+        }
         
         socket.emit('create_group', { 
             id: id, 
@@ -2916,6 +3516,35 @@
             profileColor: color, 
             members: members 
         }); 
+    }
+
+    function submitCreateRave() {
+        const id = document.getElementById('rave-id-input').value.trim(); 
+        const name = document.getElementById('rave-name-input').value.trim(); 
+        
+        if (!id || !name) {
+            return showToast("Укажите ID и Название"); 
+        }
+        
+        const checkboxes = document.querySelectorAll('#rave-members-list input[type="checkbox"]:checked'); 
+        const members = Array.from(checkboxes).map(cb => cb.value); 
+        
+        if (members.length > 9) {
+            return showToast("Максимум 10 участников в кинозале (включая вас)"); 
+        }
+        
+        socket.emit('create_group', { 
+            id: id, 
+            type: 'rave', 
+            name: name, 
+            description: 'Кинозал Rave', 
+            avatar: currentGroupAvatarBase64, 
+            profileBg: currentGroupBgBase64, 
+            profileColor: '#ff0054', 
+            members: members 
+        }); 
+        
+        toggleCreateRaveModal(false);
     }
 
     function startReply(username, text) { 
@@ -3032,14 +3661,22 @@
     }
     
     function switchSettingsTab(tabId) { 
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); 
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.remove('active');
+        }); 
+        document.querySelectorAll('.tab-content').forEach(c => {
+            c.classList.remove('active');
+        }); 
         
         const btn = document.querySelector(`.tab-btn[onclick="switchSettingsTab('${tabId}')"]`); 
         const content = document.getElementById(`tab-${tabId}`); 
         
-        if (btn) btn.classList.add('active'); 
-        if (content) content.classList.add('active'); 
+        if (btn) {
+            btn.classList.add('active'); 
+        }
+        if (content) {
+            content.classList.add('active'); 
+        }
     }
 
     socket.on('invite_link_generated', (data) => {
@@ -3049,7 +3686,10 @@
 
     // --- МОБИЛЬНЫЕ ВКЛАДКИ (КОНТАКТЫ И ЗВОНКИ) ---
     function switchMobileTab(tabId, btnElement) {
-        document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
         if (btnElement) {
             btnElement.classList.add('active');
         }
@@ -3060,7 +3700,9 @@
         if (tabId === 'settings') {
             toggleSettings(true);
         } else {
-            document.querySelectorAll('.mobile-tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.mobile-tab-content').forEach(el => {
+                el.classList.add('hidden');
+            });
             document.getElementById('tab-content-' + tabId).classList.remove('hidden');
             
             if (tabId === 'contacts') {
@@ -3209,10 +3851,15 @@
         const icon = document.getElementById('icon-' + audioId); 
         const progress = document.getElementById('progress-' + audioId); 
         
-        if(icon) icon.className = 'fas fa-play'; 
-        if(progress) progress.style.width = '0%'; 
+        if(icon) {
+            icon.className = 'fas fa-play'; 
+        }
+        if(progress) {
+            progress.style.width = '0%'; 
+        }
         
         setAudioDuration(audioId); 
+        
         if(currentPlayingAudio && currentPlayingAudio.id === audioId) {
             currentPlayingAudio = null; 
         }
@@ -3233,6 +3880,203 @@
         } 
     }
 
+    // === ЛОГИКА RAVE (КИНОЗАЛА) ИЗ КЛИЕНТА ===
+    let raveSyncInterval = null;
+    
+    function searchRaveVideo() {
+        const query = document.getElementById('rave-url-input').value.trim();
+        const platform = document.getElementById('rave-source-type').value;
+        
+        if (!query) return;
+
+        // Если это прямая ссылка (начинается с http), то просто включаем её
+        if (query.startsWith('http')) {
+            setRaveVideoDirect(query, platform);
+            return;
+        }
+
+        // Иначе отправляем запрос на поиск
+        const resultsContainer = document.getElementById('rave-search-results');
+        resultsContainer.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-dim);"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Ищем видео...</p></div>';
+        resultsContainer.classList.remove('hidden');
+        
+        socket.emit('rave_search_video', { platform: platform, query: query });
+    }
+
+    // Слушаем результаты поиска от сервера
+    socket.on('rave_search_results', (data) => {
+        const container = document.getElementById('rave-search-results');
+        container.innerHTML = '';
+        
+        if (!data.results || data.results.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-dim);"><i class="fas fa-search-minus fa-2x"></i><p style="margin-top:10px;">Ничего не найдено</p></div>';
+            return;
+        }
+
+        let html = '';
+        data.results.forEach(v => {
+            let embedUrl = '';
+            if (data.platform === 'youtube') {
+                embedUrl = `https://www.youtube.com/embed/${v.id}?autoplay=1&enablejsapi=1`;
+            } else {
+                embedUrl = v.url;
+            }
+            
+            html += `
+                <div class="rave-search-card" onclick="setRaveVideoDirect('${embedUrl}', '${data.platform}')">
+                    <div class="rave-search-thumb">
+                        <img src="${v.thumbnail}" alt="Thumbnail">
+                        <span class="rave-search-duration">${v.duration}</span>
+                    </div>
+                    <div class="rave-search-info">
+                        <div class="rave-search-title">${v.title}</div>
+                        <div class="rave-search-author">${v.author}</div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    });
+
+    function setRaveVideoDirect(url, typeSelect) {
+        let videoType = 'direct';
+        let finalUrl = url;
+        
+        if (typeSelect === 'youtube') {
+            videoType = 'youtube';
+            if (url.includes('<iframe') && url.includes('src="')) {
+                const match = url.match(/src="([^"]+)"/);
+                if (match && match[1]) finalUrl = match[1];
+            } else {
+                try {
+                    const videoId = url.includes('youtu.be/') ? url.split('youtu.be/')[1].split('?')[0] : new URLSearchParams(new URL(url).search).get('v');
+                    if (videoId) finalUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+                } catch(e) {}
+            }
+        } else if (typeSelect === 'vk') {
+            videoType = 'vk';
+            if (url.includes('<iframe') && url.includes('src="')) {
+                const match = url.match(/src="([^"]+)"/);
+                if (match && match[1]) finalUrl = match[1];
+            } else if (!url.includes('video_ext.php')) {
+                showToast('Для ВК нужна ссылка для встраивания (Экспорт -> код iframe)');
+                return;
+            }
+        } else if (typeSelect === 'rutube') {
+            videoType = 'rutube';
+            if (url.includes('<iframe') && url.includes('src="')) {
+                const match = url.match(/src="([^"]+)"/);
+                if (match && match[1]) finalUrl = match[1];
+            } else if (url.includes('rutube.ru/video/')) {
+                const match = url.match(/rutube\.ru\/video\/([a-zA-Z0-9]+)/);
+                if (match && match[1]) {
+                    finalUrl = `https://rutube.ru/play/embed/${match[1]}`;
+                }
+            } else if (!url.includes('/play/embed/')) {
+                showToast('Вставьте обычную ссылку на видео RuTube');
+                return;
+            }
+        }
+        
+        socket.emit('rave_update_state', { action: 'set_video', groupId: selectedChatId, videoUrl: finalUrl, videoType: videoType });
+        
+        document.getElementById('rave-url-input').value = '';
+        document.getElementById('rave-search-results').classList.add('hidden');
+    }
+
+    function applyRaveState(state) {
+        if (!state) return;
+        currentRaveState = state;
+        
+        const vidHtml = document.getElementById('rave-html-player');
+        const vidIframe = document.getElementById('rave-iframe-container');
+        const placeholder = document.getElementById('rave-placeholder');
+        
+        if (state.host === currentUser.username) {
+            document.getElementById('rave-host-controls').classList.remove('hidden');
+            document.getElementById('rave-host-status').innerHTML = '<i class="fas fa-crown"></i> Вы управляете видео (Хост)';
+        } else {
+            document.getElementById('rave-host-controls').classList.add('hidden');
+            document.getElementById('rave-search-results').classList.add('hidden');
+        }
+
+        if (!state.videoUrl) {
+            vidHtml.classList.add('hidden');
+            vidIframe.classList.add('hidden');
+            placeholder.classList.remove('hidden');
+            return;
+        }
+
+        placeholder.classList.add('hidden');
+
+        if (state.videoType === 'direct' || state.videoUrl.endsWith('.mp4')) {
+            vidIframe.classList.add('hidden');
+            vidHtml.classList.remove('hidden');
+            
+            if (vidHtml.src !== state.videoUrl) {
+                vidHtml.src = state.videoUrl;
+                vidHtml.currentTime = state.currentTime;
+            }
+            
+            if (state.isPlaying && vidHtml.paused) {
+                vidHtml.play().catch(()=>{});
+            } else if (!state.isPlaying && !vidHtml.paused) {
+                vidHtml.pause();
+            }
+        } else {
+            vidHtml.classList.add('hidden');
+            vidIframe.classList.remove('hidden');
+            
+            if (vidIframe.innerHTML.indexOf(state.videoUrl) === -1) {
+                vidIframe.innerHTML = `<iframe src="${state.videoUrl}" frameborder="0" allow="autoplay; fullscreen" style="width:100%; height:100%; border:none;"></iframe>`;
+            }
+        }
+    }
+    
+    function raveHostAction(action) {
+        const vid = document.getElementById('rave-html-player');
+        if (action === 'play') {
+            socket.emit('rave_update_state', { action: 'play', groupId: selectedChatId, currentTime: vid.currentTime });
+        } else if (action === 'pause') {
+            socket.emit('rave_update_state', { action: 'pause', groupId: selectedChatId, currentTime: vid.currentTime });
+        } else if (action === 'sync') {
+            socket.emit('rave_update_state', { action: 'seek', groupId: selectedChatId, currentTime: vid.currentTime });
+        }
+    }
+
+    socket.on('rave_state_updated', (data) => {
+        if (selectedChatId === data.groupId) {
+            applyRaveState(data.state);
+        }
+    });
+
+    socket.on('rave_sync_request', (data) => {
+        if (selectedChatId === data.groupId && currentRaveState && currentRaveState.host === currentUser.username) {
+            const vid = document.getElementById('rave-html-player');
+            socket.emit('rave_update_state', { 
+                action: 'sync_response', 
+                groupId: data.groupId, 
+                requester: data.requester, 
+                currentTime: vid.currentTime, 
+                isPlaying: !vid.paused 
+            });
+        }
+    });
+
+    socket.on('rave_sync_response', (data) => {
+        if (selectedChatId === data.groupId) {
+            const vid = document.getElementById('rave-html-player');
+            if (Math.abs(vid.currentTime - data.currentTime) > 1.5) {
+                vid.currentTime = data.currentTime;
+            }
+            if (data.isPlaying && vid.paused) {
+                vid.play().catch(()=>{});
+            } else if (!data.isPlaying && !vid.paused) {
+                vid.pause();
+            }
+        }
+    });
+
     sendBtn.onclick = send; 
     
     msgInput.onkeypress = (e) => { 
@@ -3242,7 +4086,7 @@
     };
     
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log(err));
     }
 </script>
 </body>
