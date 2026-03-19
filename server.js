@@ -9,6 +9,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const { ExpressPeerServer } = require('peer');
+const ytSearch = require('yt-search'); // <-- ДОБАВЛЕН ПОИСК YOUTUBE
 
 const app = express();
 const server = http.createServer(app);
@@ -16,13 +17,11 @@ const io = new Server(server, {
     maxHttpBufferSize: 5e7 
 });
 
-// --- Настройка Telegram Бота ---
 const tgToken = '8666406149:AAHJA4-jhQTk2GDfvwfJdtWJejGfpwHvUEs';
 const tgBot = new TelegramBot(tgToken, { 
     polling: true 
 });
 
-// Игнорируем ошибку 409
 tgBot.on('polling_error', (error) => {
     if (error.code !== 'ETELEGRAM' || !error.message.includes('409 Conflict')) {
         console.error('Telegram Polling Error:', error.message);
@@ -49,7 +48,6 @@ tgBot.on('message', async (msg) => {
     }
 });
 
-// --- HTML Шаблон для письма ---
 function getEmailTemplate(code) { 
     return ` 
     <div style="font-family: -apple-system, sans-serif; background-color: #f0f2f5; padding: 40px 20px; text-align: center;"> 
@@ -74,14 +72,12 @@ function getEmailTemplate(code) {
 
 const verificationCodes = {};
 
-// --- Настройки сервера ---
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(__dirname));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-// Сессии храним в памяти
 app.use(session({
     secret: 'aura-secret-key-2026-pro',
     resave: true,
@@ -95,7 +91,6 @@ app.use(session({
 const USERS_FILE = path.join(__dirname, 'users.json');
 const GROUPS_FILE = path.join(__dirname, 'groups.json');
 
-// --- ОПТИМИЗАЦИЯ ДЛЯ RENDER (КЭШИРОВАНИЕ В ПАМЯТЬ) ---
 let usersCache = {};
 let groupsCache = {};
 
@@ -120,7 +115,6 @@ function initFiles() {
     }
 }
 
-// Асинхронное сохранение для предотвращения зависаний
 function saveUsers() {
     fs.writeFile(USERS_FILE, JSON.stringify(usersCache, null, 2), (err) => {
         if (err) console.error("Ошибка сохранения пользователей:", err);
@@ -195,7 +189,6 @@ async function initDB() {
 }
 initDB();
 
-// --- API ДЛЯ ПРИВЯЗКИ TELEGRAM ---
 app.get('/api/generate-tg-token', async (req, res) => {
     const token = 'bind_' + Math.random().toString(36).substr(2, 9);
     await db.run('INSERT INTO temp_tg_binds (token, createdAt) VALUES (?, ?)', [token, Date.now()]);
@@ -215,7 +208,6 @@ app.get('/api/check-tg-token', async (req, res) => {
     }
 });
 
-// --- МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ ---
 app.post('/api/check-user', (req, res) => {
     const { loginId } = req.body;
     let targetUsername = null;
@@ -469,6 +461,7 @@ app.get('/api/entity/:id', (req, res) => {
             admins: group.admins || {},
             muted: group.muted || {},
             inviteHash: group.inviteHash || null,
+            raveState: group.raveState || null,
             isOnline: false, 
             lastSeen: null, 
             membersList: group.members.map(m => ({
@@ -550,7 +543,6 @@ app.get('/api/entity/:id', (req, res) => {
     });
 });
 
-// --- WebSocket Логика ---
 const onlineUsers = {}; 
 
 io.on('connection', (socket) => {
@@ -739,7 +731,7 @@ io.on('connection', (socket) => {
             const g = groupsCache[data.to];
             if (g.muted && g.muted[currentUsername]) {
                 if (Date.now() < g.muted[currentUsername]) {
-                    socket.emit('error_msg', 'Вы временно заглушены в этом чате модератором.');
+                    socket.emit('error_msg', 'Вы временно заглушены в этом чате.');
                     return;
                 } else {
                     delete g.muted[currentUsername];
@@ -747,11 +739,9 @@ io.on('connection', (socket) => {
                 }
             }
             
-            if (g.type === 'channel' && g.creator !== currentUsername) {
-                if (!g.admins || !g.admins[currentUsername]) {
-                    socket.emit('error_msg', 'В канал могут писать только администраторы.');
-                    return; 
-                }
+            if (g.type === 'channel' && g.creator !== currentUsername && (!g.admins || !g.admins[currentUsername])) {
+                socket.emit('error_msg', 'В канал могут писать только администраторы.');
+                return; 
             }
         }
 
@@ -844,6 +834,129 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- ЛОГИКА ПОИСКА ВИДЕО ДЛЯ RAVE ---
+    // --- ПОЛНЫЙ И ИСПРАВЛЕННЫЙ БЛОК ПОИСКА ВИДЕО ДЛЯ RAVE ---
+    socket.on('rave_search_video', async (data) => {
+        if (!currentUsername) return;
+        
+        try {
+            if (data.platform === 'youtube') {
+                const r = await ytSearch(data.query);
+                const videos = r.videos.slice(0, 12).map(v => ({
+                    id: v.videoId,
+                    title: v.title,
+                    thumbnail: v.thumbnail,
+                    duration: v.timestamp,
+                    author: v.author.name,
+                    url: v.url
+                }));
+                socket.emit('rave_search_results', { platform: 'youtube', results: videos });
+            } 
+            else if (data.platform === 'rutube') {
+                const response = await fetch(`https://rutube.ru/api/search/video/?query=${encodeURIComponent(data.query)}`);
+                const json = await response.json();
+                
+                if (json && json.results) {
+                    const videos = json.results.slice(0, 12).map(v => {
+                        let totalSeconds = Math.floor(v.duration / 1000);
+                        let mins = Math.floor(totalSeconds / 60);
+                        let secs = totalSeconds % 60;
+                        return {
+                            id: v.id,
+                            title: v.title,
+                            thumbnail: v.thumbnail_url,
+                            duration: `${mins}:${secs.toString().padStart(2, '0')}`,
+                            author: v.author ? v.author.name : 'RuTube',
+                            url: v.video_url
+                        };
+                    });
+                    socket.emit('rave_search_results', { platform: 'rutube', results: videos });
+                } else {
+                    socket.emit('rave_search_results', { platform: 'rutube', results: [] });
+                }
+            }
+            else if (data.platform === 'vk') {
+                const VK_TOKEN = 'vk1.a.PX-eCm4zvq9YVh0KKkO4ERaBu8g_qb1e-mP3eWoj_YCXic4wPYf2c0Z-MN4rfhI7ZeS4xXBLPbCfITWn_HeUyEdaElscpQ9cQhxfqXcnyVtAALBPIoFNu-iKf9kS8S4e1LgsApOhtC-Qql6ACYclQz6Bctv2hnVi5df5Hb2Cz4JjiShDg1Z9leA1XwYNERKVEbTcF_gm9jMpGnYvAoYvFA'; 
+                
+                const response = await fetch(`https://api.vk.com/method/video.search?q=${encodeURIComponent(data.query)}&count=12&access_token=${VK_TOKEN}&v=5.131`);
+                const json = await response.json();
+
+                if (json.response && json.response.items) {
+                    const videos = json.response.items.map(v => {
+                        let mins = Math.floor(v.duration / 60);
+                        let secs = v.duration % 60;
+                        let hash = '';
+                        if (v.player && v.player.includes('hash=')) {
+                            hash = v.player.split('hash=')[1].split('&')[0];
+                        }
+
+                        return {
+                            id: `${v.owner_id}_${v.id}`,
+                            title: v.title,
+                            thumbnail: v.image ? v.image[v.image.length - 1].url : (v.photo_320 || ''),
+                            duration: `${mins}:${secs.toString().padStart(2, '0')}`,
+                            author: 'VK Video',
+                            url: `https://vk.com/video_ext.php?oid=${v.owner_id}&id=${v.id}&hash=${hash}`
+                        };
+                    });
+                    socket.emit('rave_search_results', { platform: 'vk', results: videos });
+                } else {
+                    socket.emit('error_msg', 'Ничего не найдено в VK');
+                    socket.emit('rave_search_results', { platform: 'vk', results: [] });
+                }
+            }
+        } catch (err) {
+            console.error('Ошибка поиска Rave:', err);
+            socket.emit('error_msg', 'Ошибка при поиске видео');
+            socket.emit('rave_search_results', { platform: data.platform, results: [] });
+        }
+    }); // <-- ТУТ ЗАКРЫВАЕТСЯ СОБЫТИЕ
+
+    // --- ЛОГИКА RAVE (КИНОЗАЛА) УПРАВЛЕНИЕ ---
+    socket.on('rave_update_state', (data) => {
+        if (!currentUsername) return;
+        const g = groupsCache[data.groupId];
+        if (!g || g.type !== 'rave') return;
+        
+        if (g.raveState.host !== currentUsername && data.action !== 'sync_request' && data.action !== 'sync_response') return;
+        
+        if (data.action === 'set_video') {
+            g.raveState.videoUrl = data.videoUrl;
+            g.raveState.videoType = data.videoType;
+            g.raveState.currentTime = 0;
+            g.raveState.isPlaying = false;
+            g.raveState.updatedAt = Date.now();
+            saveGroups();
+            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+        } else if (data.action === 'play') {
+            g.raveState.isPlaying = true;
+            g.raveState.currentTime = data.currentTime;
+            g.raveState.updatedAt = Date.now();
+            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+        } else if (data.action === 'pause') {
+            g.raveState.isPlaying = false;
+            g.raveState.currentTime = data.currentTime;
+            g.raveState.updatedAt = Date.now();
+            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+        } else if (data.action === 'seek') {
+            g.raveState.currentTime = data.currentTime;
+            g.raveState.updatedAt = Date.now();
+            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+        } else if (data.action === 'pass_host') {
+            g.raveState.host = data.newHost;
+            saveGroups();
+            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+        } else if (data.action === 'sync_request') {
+            if (onlineUsers[g.raveState.host]) {
+                io.to(onlineUsers[g.raveState.host]).emit('rave_sync_request', { groupId: data.groupId, requester: currentUsername });
+            }
+        } else if (data.action === 'sync_response') {
+            if (onlineUsers[data.requester]) {
+                io.to(onlineUsers[data.requester]).emit('rave_sync_response', { groupId: data.groupId, currentTime: data.currentTime, isPlaying: data.isPlaying });
+            }
+        }
+    });
+
     socket.on('view_channel_msg', async (data) => {
         if (!currentUsername) return;
         const msg = await db.get('SELECT views FROM messages WHERE id = ? AND isChannelPost = 1', [data.id]);
@@ -925,7 +1038,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- ЛОГИКА ИСТОРИЙ (STORIES) ---
     socket.on('upload_story', async (data) => {
         if (!currentUsername) return;
         const id = Date.now().toString();
@@ -1093,7 +1205,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // АДМИН ПАНЕЛЬ: Выдача прав
     socket.on('promote_admin', (data) => {
         if (!currentUsername) return;
         const g = groupsCache[data.groupId];
@@ -1121,7 +1232,7 @@ io.on('connection', (socket) => {
         if (!currentUsername) return;
         const g = groupsCache[data.groupId];
         if (g && (g.creator === currentUsername || (g.admins && g.admins[currentUsername]))) {
-            if (g.creator === data.userId) return; // Нельзя замутить создателя
+            if (g.creator === data.userId) return;
             if (!g.muted) {
                 g.muted = {};
             }
@@ -1131,7 +1242,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ГЕНЕРАЦИЯ ИНВАЙТ ССЫЛОК
     socket.on('generate_invite_link', (data) => {
         if (!currentUsername) return;
         const g = groupsCache[data.groupId];
@@ -1143,7 +1253,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ВХОД ПО ИНВАЙТ ССЫЛКЕ
     socket.on('join_by_hash', async (data) => {
         if (!currentUsername) return;
         let targetGroup = null;
@@ -1156,6 +1265,11 @@ io.on('connection', (socket) => {
         }
         
         if (targetGroup) {
+            if (targetGroup.type === 'rave' && targetGroup.members.length >= 10) {
+                socket.emit('error_msg', 'В кинозале нет мест (максимум 10 человек)');
+                return;
+            }
+            
             if (!targetGroup.members.includes(currentUsername)) {
                 targetGroup.members.push(currentUsername);
                 saveGroups();
@@ -1200,7 +1314,17 @@ io.on('connection', (socket) => {
             }
         });
 
-        let members = [...new Set(allowedMembers)].slice(0, 100);
+        if (data.type === 'rave' && allowedMembers.length > 10) {
+            allowedMembers = allowedMembers.slice(0, 10);
+        }
+
+        let members = [...new Set(allowedMembers)].slice(0, data.type === 'rave' ? 10 : 100);
+        
+        let raveState = null;
+        if (data.type === 'rave') {
+            raveState = { videoUrl: '', videoType: '', isPlaying: false, currentTime: 0, host: currentUsername, updatedAt: Date.now() };
+        }
+
         groupsCache[data.id] = { 
             id: data.id, 
             type: data.type || 'group', 
@@ -1213,14 +1337,15 @@ io.on('connection', (socket) => {
             creator: currentUsername, 
             members: members,
             admins: {}, 
-            muted: {}
+            muted: {},
+            raveState: raveState
         };
         
         saveGroups();
         socket.emit('group_created', { groupId: data.id });
 
         const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
-        const sysText = `создал(а) ${data.type === 'channel' ? 'канал' : 'группу'} "${data.name}"`;
+        const sysText = `создал(а) ${data.type === 'channel' ? 'канал' : (data.type === 'rave' ? 'кинозал' : 'группу')} "${data.name}"`;
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.id, sysText, timeStr]);
@@ -1258,7 +1383,6 @@ io.on('connection', (socket) => {
         if (msg) {
             const recipient = msg.toUser === currentUsername ? msg.fromUser : msg.toUser;
             
-            // Проверка прав на удаление ЧУЖОГО сообщения в группе
             let hasAdminRights = false;
             if (groupsCache[recipient] && msg.fromUser !== currentUsername) {
                 const g = groupsCache[recipient];
@@ -1297,7 +1421,7 @@ io.on('connection', (socket) => {
         const g = groupsCache[data.groupId];
         
         if (g && (g.creator === currentUsername || (g.admins && g.admins[currentUsername]))) {
-            if (g.creator === data.userId) return; // Нельзя кикнуть создателя
+            if (g.creator === data.userId) return; 
 
             g.members = g.members.filter(m => m !== data.userId);
             saveGroups();
@@ -1354,7 +1478,6 @@ const peerServer = ExpressPeerServer(server, {
 });
 app.use('/peerjs', peerServer);
 
-// --- ОБРАБОТКА КОРОТКИХ ССЫЛОК И ИНВАЙТОВ В САМОМ НИЗУ ---
 app.get('/join/:hash', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -1362,8 +1485,7 @@ app.get('/join/:hash', (req, res) => {
 app.get('/:id', (req, res, next) => {
     const id = req.params.id;
     
-    // Игнорируем системные запросы и файлы с расширениями
-    const reserved = ['api', 'socket.io', 'uploads', 'peerjs', 'join', 'auth.html', 'index.html', 'manifest.json', 'style.css', 'sw.js', 'favicon.ico', 'send.mp3', 'notify.mp3'];
+    const reserved = ['api', 'socket.io', 'uploads', 'peerjs', 'join', 'auth.html', 'index.html', 'manifest.json', 'style.css', 'sw.js', 'favicon.ico'];
     
     if (id.includes('.') || reserved.includes(id)) {
         return next();
