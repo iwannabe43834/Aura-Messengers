@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
     <script>
+        // Сохраняем куда юзер пытался зайти до авторизации (для коротких ссылок и инвайтов)
         if (!localStorage.getItem('username')) {
             if (window.location.pathname.length > 1) {
                 localStorage.setItem('redirect_after_login', window.location.pathname);
@@ -45,14 +46,48 @@
             color: var(--primary);
         }
         
-        .mobile-tab-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-        .mobile-tab-content.hidden { display: none !important; }
-        .empty-state { padding: 40px 20px; text-align: center; color: var(--text-dim); font-size: 1.1rem; display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        .empty-state i { font-size: 3rem; opacity: 0.5; }
+        .mobile-tab-content { 
+            display: flex; 
+            flex-direction: column; 
+            flex: 1; 
+            overflow: hidden; 
+        }
+        .mobile-tab-content.hidden { 
+            display: none !important; 
+        }
+        .empty-state { 
+            padding: 40px 20px; 
+            text-align: center; 
+            color: var(--text-dim); 
+            font-size: 1.1rem; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 15px; 
+        }
+        .empty-state i { 
+            font-size: 3rem; 
+            opacity: 0.5; 
+        }
         
-        .chat-link { color: var(--primary); text-decoration: underline; word-break: break-all; }
-        .chat-mention { color: var(--primary); cursor: pointer; font-weight: bold; background: rgba(135, 116, 225, 0.15); padding: 2px 6px; border-radius: 6px; transition: 0.2s; display: inline-block; }
-        .chat-mention:hover { background: rgba(135, 116, 225, 0.3); }
+        .chat-link { 
+            color: var(--primary); 
+            text-decoration: underline; 
+            word-break: break-all; 
+        }
+        .chat-mention { 
+            color: var(--primary); 
+            cursor: pointer; 
+            font-weight: bold; 
+            background: rgba(135, 116, 225, 0.15); 
+            padding: 2px 6px; 
+            border-radius: 6px; 
+            transition: 0.2s; 
+            display: inline-block; 
+        }
+        .chat-mention:hover { 
+            background: rgba(135, 116, 225, 0.3); 
+        }
     </style>
 </head>
 <body class="pattern-none" id="app-body" data-theme="dark" data-lang="ru">
@@ -485,10 +520,23 @@
     </aside>
 
     <nav class="mobile-bottom-nav">
-        <button class="nav-item" onclick="switchMobileTab('contacts', this)"><i class="fas fa-user-circle"></i><span>Контакты</span></button>
-        <button class="nav-item" onclick="switchMobileTab('calls', this)"><i class="fas fa-phone-alt"></i><span>Звонки</span></button>
-        <button class="nav-item active" onclick="switchMobileTab('chats', this)"><i class="fas fa-comments"></i><span>Чаты</span><div class="nav-badge" id="total-unread-badge"></div></button>
-        <button class="nav-item" onclick="switchMobileTab('settings', this)"><i class="fas fa-cog"></i><span>Настройки</span></button>
+        <button class="nav-item" onclick="switchMobileTab('contacts', this)">
+            <i class="fas fa-user-circle"></i>
+            <span>Контакты</span>
+        </button>
+        <button class="nav-item" onclick="switchMobileTab('calls', this)">
+            <i class="fas fa-phone-alt"></i>
+            <span>Звонки</span>
+        </button>
+        <button class="nav-item active" onclick="switchMobileTab('chats', this)">
+            <i class="fas fa-comments"></i>
+            <span>Чаты</span>
+            <div class="nav-badge" id="total-unread-badge"></div>
+        </button>
+        <button class="nav-item" onclick="switchMobileTab('settings', this)">
+            <i class="fas fa-cog"></i>
+            <span>Настройки</span>
+        </button>
     </nav>
 
     <main class="chat-area" id="chat-area-main">
@@ -874,7 +922,9 @@
         
         if (!menu.classList.contains('hidden')) {
             menu.style.display = 'flex';
-            setTimeout(() => menu.classList.add('show'), 10);
+            setTimeout(() => {
+                menu.classList.add('show');
+            }, 10);
         } else {
             menu.classList.remove('show');
         }
@@ -884,7 +934,9 @@
         const menu = document.getElementById('chat-header-dropdown');
         if (menu && !menu.classList.contains('hidden') && !e.target.closest('#chat-header-dropdown') && !e.target.closest('.header-menu-btn')) {
             menu.classList.remove('show');
-            setTimeout(() => menu.classList.add('hidden'), 200);
+            setTimeout(() => {
+                menu.classList.add('hidden');
+            }, 200);
         }
     });
 
@@ -1139,7 +1191,8 @@
             let listHtml = '';
             viewsArray.forEach(v => {
                 let reactEmoji = reactsObj[v] ? `<span style="font-size:1.2rem;">${reactsObj[v]}</span>` : '';
-                listHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:5px; align-items:center;">
+                listHtml += `
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px; align-items:center;">
                     <span>@${v}</span> ${reactEmoji}
                 </div>`;
             });
@@ -1178,7 +1231,9 @@
     }
 
     function closeStory(force = false, e = null) {
-        if (e && e.target.id !== 'story-viewer-overlay') return;
+        if (e && e.target.id !== 'story-viewer-overlay') {
+            return;
+        }
         
         clearTimeout(storyTimeoutId);
         document.getElementById('story-viewer-overlay').classList.remove('active');
@@ -1186,7 +1241,9 @@
     }
 
     function deleteCurrentStory() {
-        if (!viewingStoriesList[currentStoryViewerIndex]) return;
+        if (!viewingStoriesList[currentStoryViewerIndex]) {
+            return;
+        }
         
         if (confirm("Удалить историю?")) {
             socket.emit('delete_story', { id: viewingStoriesList[currentStoryViewerIndex].id });
@@ -1236,7 +1293,9 @@
         
         setTimeout(() => { 
             t.style.opacity = '0'; 
-            setTimeout(() => t.remove(), 400); 
+            setTimeout(() => {
+                t.remove();
+            }, 400); 
         }, 3000); 
     }
 
@@ -1282,6 +1341,7 @@
         try { 
             const res = await fetch(`/api/entity/${chatId}`); 
             const data = await res.json(); 
+            
             if (data.isBlocked) {
                 chatStatusEl.textContent = dict[currentLang].blockedStatus;
             } else if (data.isOnline) {
@@ -1317,9 +1377,15 @@
             document.getElementById('edit-emoji-status').value = currentUser.emojiStatus || '';
             
             if (currentUser.privacy) {
-                if(currentUser.privacy.calls) document.getElementById('priv-calls').value = currentUser.privacy.calls;
-                if(currentUser.privacy.online) document.getElementById('priv-online').value = currentUser.privacy.online;
-                if(currentUser.privacy.groups) document.getElementById('priv-groups').value = currentUser.privacy.groups;
+                if (currentUser.privacy.calls) {
+                    document.getElementById('priv-calls').value = currentUser.privacy.calls;
+                }
+                if (currentUser.privacy.online) {
+                    document.getElementById('priv-online').value = currentUser.privacy.online;
+                }
+                if (currentUser.privacy.groups) {
+                    document.getElementById('priv-groups').value = currentUser.privacy.groups;
+                }
             }
 
             applySavedPreferences(); 
@@ -1329,15 +1395,22 @@
                 await Notification.requestPermission();
             }
 
-            // Короткие ссылки и инвайты
+            // КОРОТКИЕ ССЫЛКИ И ИНВАЙТЫ
             let targetPath = localStorage.getItem('redirect_after_login') || window.location.pathname;
             localStorage.removeItem('redirect_after_login');
 
             if (targetPath.length > 1 && !targetPath.startsWith('/join/')) {
                 const targetId = targetPath.substring(1);
-                setTimeout(() => {
-                    viewUserProfile(targetId);
-                }, 500);
+                
+                // ИГНОРИРУЕМ СИСТЕМНЫЕ ФАЙЛЫ И ПУТИ (например, index.html)
+                const reservedPaths = ['index.html', 'auth.html', 'manifest.json', 'style.css', 'sw.js', 'favicon.ico'];
+                
+                if (!reservedPaths.includes(targetId) && !targetId.includes('.')) {
+                    setTimeout(() => {
+                        viewUserProfile(targetId);
+                    }, 500);
+                }
+                
                 window.history.pushState({}, '', '/');
             }
 
@@ -1423,12 +1496,15 @@
         } else {
             const res = await fetch(`/api/entity/${chatId}`); 
             const data = await res.json(); 
+            
             isCurrentChatGroup = (data.type === 'group' || data.type === 'channel'); 
-            
             let emojiHtml = data.emojiStatus ? `<span class="emoji-status-badge">${data.emojiStatus}</span>` : '';
-            document.getElementById('chat-with-title').innerHTML = `${data.displayName || data.name || chatId} ${emojiHtml}`; 
             
-            document.getElementById('chat-header-info').onclick = () => viewUserProfile(chatId); 
+            document.getElementById('chat-with-title').innerHTML = `${data.displayName || data.name || chatId} ${emojiHtml}`; 
+            document.getElementById('chat-header-info').onclick = () => {
+                viewUserProfile(chatId);
+            }; 
+            
             headerAvatar.innerHTML = '';
             
             if (data.isBlocked) { 
@@ -1488,10 +1564,18 @@
         ctxTarget = { id, isMine, from, text };
         
         const editBtn = document.getElementById('ctx-edit-btn'); 
-        if (isMine) editBtn.style.display = 'flex'; else editBtn.style.display = 'none';
+        if (isMine) {
+            editBtn.style.display = 'flex'; 
+        } else {
+            editBtn.style.display = 'none';
+        }
         
         const pinBtn = document.getElementById('ctx-pin-btn'); 
-        if (isCurrentChatGroup) pinBtn.style.display = 'flex'; else pinBtn.style.display = 'none';
+        if (isCurrentChatGroup) {
+            pinBtn.style.display = 'flex'; 
+        } else {
+            pinBtn.style.display = 'none';
+        }
         
         contextMenuEl.classList.remove('hidden'); 
         contextMenuEl.style.display = 'flex';
@@ -1500,38 +1584,55 @@
         let y = e.pageY || (e.touches ? e.touches[0].pageY : 0);
         
         const rect = contextMenuEl.getBoundingClientRect(); 
-        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 10; 
-        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 10;
+        
+        if (x + rect.width > window.innerWidth) {
+            x = window.innerWidth - rect.width - 10; 
+        }
+        
+        if (y + rect.height > window.innerHeight) {
+            y = window.innerHeight - rect.height - 10;
+        }
         
         contextMenuEl.style.left = `${x}px`; 
         contextMenuEl.style.top = `${y}px`; 
         
-        setTimeout(() => contextMenuEl.classList.add('show'), 10);
+        setTimeout(() => {
+            contextMenuEl.classList.add('show');
+        }, 10);
     }
     
     function closeContextMenu() { 
         contextMenuEl.classList.remove('show'); 
-        setTimeout(() => contextMenuEl.classList.add('hidden'), 200); 
+        setTimeout(() => {
+            contextMenuEl.classList.add('hidden');
+        }, 200); 
     }
     
     function contextReact(emoji) { 
-        if(ctxTarget) socket.emit('add_reaction', { id: ctxTarget.id, emoji }); 
+        if(ctxTarget) {
+            socket.emit('add_reaction', { id: ctxTarget.id, emoji }); 
+        }
         closeContextMenu(); 
     }
     
     function contextReply() { 
-        if(ctxTarget) startReply(ctxTarget.from, ctxTarget.text || 'Медиа'); 
+        if(ctxTarget) {
+            startReply(ctxTarget.from, ctxTarget.text || 'Медиа'); 
+        }
         closeContextMenu(); 
     }
     
     function contextEdit() { 
         if (!ctxTarget || !ctxTarget.isMine) return; 
+        
         editData = { id: ctxTarget.id }; 
         msgInput.value = ctxTarget.text || ''; 
         msgInput.focus(); 
+        
         sendBtn.innerHTML = '<i class="fas fa-check"></i>'; 
         sendBtn.classList.remove('hidden'); 
         micBtn.classList.add('hidden'); 
+        
         closeContextMenu(); 
     }
     
@@ -1543,6 +1644,7 @@
     
     function contextDelete() { 
         if(!ctxTarget) return; 
+        
         if (ctxTarget.isMine && selectedChatId !== 'me') { 
             if (confirm("Удалить для ВСЕХ?")) {
                 socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: true }); 
@@ -1554,25 +1656,31 @@
                 socket.emit('delete_msg', { id: ctxTarget.id, forEveryone: false }); 
             }
         } 
+        
         closeContextMenu(); 
     }
 
     function generateReactionsHtml(msgId, reactionsObj) { 
         if (!reactionsObj) return ''; 
+        
         let html = ''; 
+        
         for (const [emoji, users] of Object.entries(reactionsObj)) { 
             if (users.length > 0) { 
                 const reacted = users.includes(currentUser.username); 
                 html += `<div class="reaction-badge ${reacted ? 'reacted' : ''}" onclick="socket.emit('add_reaction', {id: '${msgId}', emoji: '${emoji}'})">${emoji} <small>${users.length}</small></div>`; 
             } 
         } 
+        
         return html; 
     }
 
     // --- ПАРСИНГ ССЫЛОК И УПОМИНАНИЙ ---
     function formatText(text) {
         if (!text) return '';
-        if (text.includes('<span class="system-call-msg">')) return text; 
+        if (text.includes('<span class="system-call-msg">')) {
+            return text; 
+        }
         
         let s = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         
@@ -1591,7 +1699,12 @@
             sysDiv.style = "text-align: center; margin: 10px 0;"; 
             sysDiv.setAttribute('data-id', msg.id);
             sysDiv.innerHTML = `<span style="background: rgba(0,0,0,0.3); padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; color: var(--text-dim); backdrop-filter: blur(5px);"><b>${msg.from}</b> ${msg.text}</span>`;
-            if (isPrepend) messagesDiv.insertBefore(sysDiv, messagesDiv.firstChild); else messagesDiv.appendChild(sysDiv);
+            
+            if (isPrepend) {
+                messagesDiv.insertBefore(sysDiv, messagesDiv.firstChild); 
+            } else {
+                messagesDiv.appendChild(sysDiv);
+            }
             return;
         }
 
@@ -1637,6 +1750,7 @@
         }
         
         let replyMarkup = msg.reply ? `<div class="msg-reply-info"><small>↩ ${msg.reply.username}</small><div>${formatText(msg.reply.text)}</div></div>` : '';
+        
         const ticksHtml = isMine ? `<span class="status-ticks ${msg.read ? 'read' : ''}"><i class="fas fa-check"></i>${msg.read ? '<i class="fas fa-check" style="margin-left:-4px"></i>' : ''}</span>` : '';
         
         const avId = 'msg-av-' + Math.random().toString(36).substr(2, 9); 
@@ -1664,7 +1778,9 @@
         }
         
         const bubbleEl = div.querySelector('.bubble'); 
-        bubbleEl.oncontextmenu = (e) => openContextMenu(e, msg.id, isMine, msg.from, msg.text); 
+        bubbleEl.oncontextmenu = (e) => {
+            openContextMenu(e, msg.id, isMine, msg.from, msg.text);
+        }; 
         
         bubbleEl.ontouchstart = (e) => { 
             longPressTimer = setTimeout(() => { 
@@ -1672,11 +1788,18 @@
             }, 500); 
         }; 
         
-        bubbleEl.ontouchend = () => clearTimeout(longPressTimer); 
-        bubbleEl.ontouchmove = () => clearTimeout(longPressTimer);
+        bubbleEl.ontouchend = () => {
+            clearTimeout(longPressTimer);
+        }; 
+        
+        bubbleEl.ontouchmove = () => {
+            clearTimeout(longPressTimer);
+        };
         
         if (!isMine && !isSaved) { 
-            fetch(`/api/entity/${msg.from}`).then(res => res.json()).then(data => { 
+            fetch(`/api/entity/${msg.from}`)
+            .then(res => res.json())
+            .then(data => { 
                 const avEl = document.getElementById(avId); 
                 if (avEl) { 
                     if (data.isBlocked) { 
@@ -1697,6 +1820,7 @@
 
     function send() {
         const text = msgInput.value.trim();
+        
         if (editData && text) { 
             socket.emit('edit_msg', { id: editData.id, text: text }); 
             editData = null; 
@@ -1727,6 +1851,7 @@
         if (selectedChatId && selectedChatId !== 'me') { 
             socket.emit('typing', { to: selectedChatId }); 
             clearTimeout(typingTimer); 
+            
             typingTimer = setTimeout(() => { 
                 socket.emit('stop_typing', { to: selectedChatId }); 
             }, 2000); 
@@ -1736,6 +1861,7 @@
     function toggleChatSearch() { 
         const bar = document.getElementById('chat-search-bar'); 
         bar.classList.toggle('hidden'); 
+        
         if (!bar.classList.contains('hidden')) {
             document.getElementById('chat-search-input').focus(); 
         } else { 
@@ -1751,10 +1877,18 @@
         }
     }
 
-    let mediaRecorder, audioChunks = [], isRecording = false, isCancelled = false, recordingTimerId, recordingStartTime, startX, typingTimer;
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+    let isCancelled = false;
+    let recordingTimerId;
+    let recordingStartTime;
+    let startX;
+    let typingTimer;
     
     async function startRecording(e) {
         if (!selectedChatId || isRecording) return;
+        
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); 
             mediaRecorder = new MediaRecorder(stream); 
@@ -1762,7 +1896,9 @@
             isCancelled = false;
             
             mediaRecorder.ondataavailable = event => { 
-                if (event.data.size > 0) audioChunks.push(event.data); 
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data); 
+                }
             };
             
             mediaRecorder.onstop = () => { 
@@ -1774,7 +1910,9 @@
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
                     sendVoiceMessage(audioBlob); 
                 } 
+                
                 isRecording = false; 
+                
                 if(selectedChatId !== 'me') {
                     socket.emit('stop_typing', { to: selectedChatId }); 
                 }
@@ -1795,7 +1933,9 @@
     }
     
     function stopRecording() { 
-        if (mediaRecorder && isRecording) mediaRecorder.stop(); 
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop(); 
+        }
     }
     
     function cancelRecording() { 
@@ -1832,7 +1972,12 @@
     function sendVoiceMessage(blob) { 
         const reader = new FileReader(); 
         reader.onloadend = () => { 
-            socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: 'voice', data: reader.result, name: 'Voice.webm' }, reply: replyData }); 
+            socket.emit('private_msg', { 
+                to: selectedChatId, 
+                text: '', 
+                media: { type: 'voice', data: reader.result, name: 'Voice.webm' }, 
+                reply: replyData 
+            }); 
             cancelReply(); 
         }; 
         reader.readAsDataURL(blob); 
@@ -1840,16 +1985,30 @@
     
     micBtn.addEventListener('mousedown', startRecording); 
     micBtn.addEventListener('touchstart', startRecording, {passive: true}); 
-    window.addEventListener('mouseup', () => { if (isRecording) stopRecording(); }); 
-    window.addEventListener('touchend', () => { if (isRecording) stopRecording(); }); 
-    window.addEventListener('mousemove', (e) => { if (isRecording) handleSwipe(e.clientX); }); 
-    window.addEventListener('touchmove', (e) => { if (isRecording) handleSwipe(e.touches[0].clientX); }, {passive: true}); 
+    
+    window.addEventListener('mouseup', () => { 
+        if (isRecording) stopRecording(); 
+    }); 
+    
+    window.addEventListener('touchend', () => { 
+        if (isRecording) stopRecording(); 
+    }); 
+    
+    window.addEventListener('mousemove', (e) => { 
+        if (isRecording) handleSwipe(e.clientX); 
+    }); 
+    
+    window.addEventListener('touchmove', (e) => { 
+        if (isRecording) handleSwipe(e.touches[0].clientX); 
+    }, {passive: true}); 
     
     function handleSwipe(currentX) { 
         const diffX = startX - currentX; 
+        
         if (diffX > 10) {
             micBtn.style.transform = `translateX(-${Math.min(diffX, 150)}px)`; 
         }
+        
         if (diffX > 120) {
             cancelRecording(); 
         }
@@ -1886,6 +2045,7 @@
             chatStatusEl.textContent = dict[currentLang].typing; 
             chatStatusEl.classList.add('typing'); 
         } 
+        
         const sub = document.getElementById(`contact-sub-${data.to}`); 
         if (sub) { 
             sub.textContent = dict[currentLang].typing; 
@@ -1897,6 +2057,7 @@
         if (data.to === selectedChatId) {
             updateChatStatus(selectedChatId, isCurrentChatGroup); 
         }
+        
         const sub = document.getElementById(`contact-sub-${data.to}`); 
         if (sub) { 
             sub.textContent = ''; 
@@ -1909,7 +2070,11 @@
             currentUser = data.user;
             updateHeaderUI();
         }
-        if(selectedChatId === data.username) openChat(data.username);
+        
+        if(selectedChatId === data.username) {
+            openChat(data.username);
+        }
+        
         updateContactsUI(data.username);
     });
 
@@ -1953,18 +2118,22 @@
 
     socket.on('msg_deleted', (data) => { 
         const el = document.querySelector(`[data-id="${data.id}"]`); 
-        if (el) el.remove(); 
+        if (el) {
+            el.remove(); 
+        }
     });
 
     socket.on('msg_edited', (data) => { 
         const row = document.querySelector(`.message-row[data-id="${data.id}"]`); 
         if (row) { 
             let textDiv = row.querySelector('.text'); 
+            
             if (!textDiv) { 
                 textDiv = document.createElement('div'); 
                 textDiv.className = 'text'; 
                 row.querySelector('.bubble').insertBefore(textDiv, row.querySelector('.msg-footer')); 
             } 
+            
             textDiv.innerHTML = `${formatText(data.text)} <small style="opacity:0.6; font-size:0.75rem;">(изм.)</small>`; 
         } 
     });
@@ -2004,11 +2173,15 @@
             isSearch = data.isSearch; 
         } 
         
-        if (history.length < 40) hasMoreHistory = false; 
+        if (history.length < 40) {
+            hasMoreHistory = false; 
+        }
         
         const oldScrollHeight = messagesDiv.scrollHeight; 
         
-        if (offset === 0 || isSearch) messagesDiv.innerHTML = ''; 
+        if (offset === 0 || isSearch) {
+            messagesDiv.innerHTML = ''; 
+        }
         
         if (offset === 0 || isSearch) { 
             history.forEach(msg => renderMsg(msg, false)); 
@@ -2027,6 +2200,7 @@
         if (viewingUserProfile === data.username) {
             updateProfileContactBtn(data.inContacts); 
         }
+        
         socket.emit('get_my_chats'); 
         
         if (!document.getElementById('tab-content-contacts').classList.contains('hidden')) {
@@ -2038,6 +2212,7 @@
         if (viewingUserProfile === data.username) {
             updateProfileBlockBtn(data.isBlocked); 
         }
+        
         if (selectedChatId === data.username) {
             openChat(data.username); 
         }
@@ -2051,17 +2226,24 @@
     });
 
     socket.on('group_updated', (data) => { 
-        if(selectedChatId === data.groupId) openChat(data.groupId); 
-        if(viewingUserProfile === data.groupId) viewUserProfile(data.groupId); 
+        if(selectedChatId === data.groupId) {
+            openChat(data.groupId); 
+        }
+        if(viewingUserProfile === data.groupId) {
+            viewUserProfile(data.groupId); 
+        }
+        
         updateContactsUI(data.groupId); 
     });
 
     socket.on('kicked_from_group', (data) => { 
         showToast("Вы были исключены из чата"); 
+        
         if(selectedChatId === data.groupId) { 
             document.getElementById('chat-ui').classList.add('hidden'); 
             document.getElementById('welcome-screen').classList.remove('hidden'); 
         } 
+        
         socket.emit('get_my_chats'); 
     });
 
@@ -2089,11 +2271,22 @@
         if (chatId === currentUser.username) return; 
         
         let el = document.getElementById(`contact-${chatId}`);
+        
         if (!el) { 
             el = document.createElement('div'); 
             el.id = `contact-${chatId}`; 
             el.className = 'contact-item'; 
-            el.innerHTML = `<div class="avatar-wrapper"><div class="avatar" id="avatar-list-${chatId}"></div><div class="online-dot" id="online-dot-${chatId}"></div></div><div class="contact-info"><strong id="contact-name-${chatId}">${chatId}</strong><div class="contact-subtext" id="contact-sub-${chatId}"></div></div><div class="unread-badge hidden" id="unread-${chatId}">0</div>`; 
+            el.innerHTML = `
+                <div class="avatar-wrapper">
+                    <div class="avatar" id="avatar-list-${chatId}"></div>
+                    <div class="online-dot" id="online-dot-${chatId}"></div>
+                </div>
+                <div class="contact-info">
+                    <strong id="contact-name-${chatId}">${chatId}</strong>
+                    <div class="contact-subtext" id="contact-sub-${chatId}"></div>
+                </div>
+                <div class="unread-badge hidden" id="unread-${chatId}">0</div>
+            `; 
             el.onclick = () => openChat(chatId); 
             contactsDiv.prepend(el); 
         } else { 
@@ -2106,7 +2299,9 @@
         const data = await res.json(); 
         
         const nameEl = document.getElementById(`contact-name-${chatId}`); 
-        if(nameEl) nameEl.textContent = data.displayName || data.name || chatId; 
+        if(nameEl) {
+            nameEl.textContent = data.displayName || data.name || chatId; 
+        }
         
         const avEl = document.getElementById(`avatar-list-${chatId}`);
         if (avEl) { 
@@ -2137,7 +2332,12 @@
         
         const reader = new FileReader(); 
         reader.onload = (e) => { 
-            socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: file.type.split('/')[0], data: e.target.result, name: file.name }, reply: replyData }); 
+            socket.emit('private_msg', { 
+                to: selectedChatId, 
+                text: '', 
+                media: { type: file.type.split('/')[0], data: e.target.result, name: file.name }, 
+                reply: replyData 
+            }); 
             cancelReply(); 
         }; 
         reader.readAsDataURL(file); 
@@ -2146,10 +2346,12 @@
     
     function updateHeaderUI() { 
         const name = currentUser.name || currentUser.username; 
+        
         document.getElementById('settings-full-name').textContent = name; 
         document.getElementById('settings-username-display').textContent = '@' + currentUser.username; 
         
         const avatarEl = document.getElementById('user-avatar-main'); 
+        
         if (currentUser.avatar) { 
             avatarEl.style.backgroundImage = `url(${currentUser.avatar})`; 
             avatarEl.textContent = ''; 
@@ -2226,6 +2428,7 @@
         reader.onload = async (e) => { 
             const base64Img = e.target.result; 
             const avatarEl = document.getElementById('user-avatar-main'); 
+            
             avatarEl.style.backgroundImage = `url(${base64Img})`; 
             avatarEl.textContent = ''; 
             
@@ -2249,6 +2452,7 @@
         const reader = new FileReader(); 
         reader.onload = async (e) => { 
             const base64Img = e.target.result; 
+            
             document.getElementById('settings-cover-preview').style.backgroundImage = `url(${base64Img})`; 
             document.getElementById('settings-cover-preview').style.backgroundSize = 'cover'; 
             
@@ -2272,12 +2476,14 @@
         viewingEntityData = data; 
         
         let emojiHtml = data.emojiStatus ? `<span class="emoji-status-badge">${data.emojiStatus}</span>` : '';
+        
         document.getElementById('p-name').innerHTML = `${data.displayName || data.name || chatId} ${emojiHtml}`; 
         document.getElementById('p-username').textContent = '@' + chatId; 
         document.getElementById('p-bio').textContent = data.bio || data.description || dict[currentLang].notSpecified; 
         document.getElementById('p-bio-label').textContent = (data.type === 'group' || data.type === 'channel') ? dict[currentLang].groupDesc : dict[currentLang].aboutMe;
         
         const pAvatar = document.getElementById('p-avatar'); 
+        
         if (data.isBlocked) { 
             pAvatar.style.backgroundImage = 'none'; 
             pAvatar.style.background = 'var(--bg-hover)'; 
@@ -2292,6 +2498,7 @@
         }
         
         document.getElementById('p-cover').className = `profile-cover pattern-${data.profilePattern || 'none'}`; 
+        
         if (data.profileBg) {
             document.getElementById('p-cover').style.backgroundImage = `url(${data.profileBg})`;
             document.getElementById('p-cover').style.backgroundSize = 'cover';
@@ -2309,7 +2516,10 @@
             if(val) { 
                 el.classList.remove('hidden'); 
                 el.querySelector('.detail-value').textContent = val; 
-                if(id==='p-row-website') el.querySelector('.detail-value').href = val.startsWith('http') ? val : 'https://' + val; 
+                
+                if(id === 'p-row-website') {
+                    el.querySelector('.detail-value').href = val.startsWith('http') ? val : 'https://' + val; 
+                }
             } else { 
                 el.classList.add('hidden'); 
             } 
@@ -2318,8 +2528,10 @@
         if (data.type === 'group' || data.type === 'channel') { 
             document.getElementById('p-status').textContent = `${data.membersCount} ${dict[currentLang].membersCount.toLowerCase()} (${data.type === 'channel' ? dict[currentLang].typeChannel : dict[currentLang].typeGroup})`; 
             document.getElementById('p-row-birthday').classList.add('hidden'); 
+            
             showField('p-row-location', null); 
             showField('p-row-website', null); 
+            
             document.getElementById('p-row-members').classList.remove('hidden'); 
             document.getElementById('p-members-count').textContent = data.membersCount; 
             
@@ -2342,19 +2554,37 @@
                 }
                 
                 let roleBadge = m.customTitle ? `<span style="background:var(--primary-soft); color:var(--primary); font-size:0.6rem; padding:2px 4px; border-radius:4px;">${m.customTitle}</span>` : '';
-                mList.innerHTML += `<div class="member-option" style="cursor:default"><div>${m.name} (@${m.username}) ${m.emojiStatus ? m.emojiStatus : ''} ${roleBadge}</div><div>${actions}</div></div>`; 
+                mList.innerHTML += `
+                    <div class="member-option" style="cursor:default">
+                        <div>${m.name} (@${m.username}) ${m.emojiStatus ? m.emojiStatus : ''} ${roleBadge}</div>
+                        <div>${actions}</div>
+                    </div>
+                `; 
             }); 
             
             if (data.myRole === 'creator' && !data.inviteHash) { 
                 mList.innerHTML = `<button class="primary-btn-small" onclick="socket.emit('generate_invite_link', {groupId: '${data.id}'})" style="margin-bottom:10px;"><i class="fas fa-link"></i> Создать ссылку-приглашение</button>` + mList.innerHTML; 
             }
+            
+            // НОВАЯ КРАСИВАЯ КНОПКА ССЫЛКИ С КНОПКОЙ СКОПИРОВАТЬ
             if (data.inviteHash && data.myRole === 'creator') { 
-                mList.innerHTML = `<div style="background:var(--bg-hover); padding:10px; border-radius:8px; margin-bottom:10px; font-size:0.85rem; word-break:break-all;">Ссылка: <b>${window.location.origin}/join/${data.inviteHash}</b></div>` + mList.innerHTML; 
+                const inviteLink = window.location.origin + '/join/' + data.inviteHash;
+                mList.innerHTML = `
+                <div style="background: var(--bg-hover); padding: 10px; border-radius: 12px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--border);">
+                    <div style="font-size: 0.85rem; word-break: break-all; flex: 1;">
+                        <span style="color: var(--text-dim); display: block; margin-bottom: 4px; font-size: 0.75rem; text-transform: uppercase;">Ссылка-приглашение:</span>
+                        <b>${inviteLink}</b>
+                    </div>
+                    <button class="primary-btn-small" style="margin: 0; width: 44px; height: 44px; flex-shrink: 0; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px;" onclick="navigator.clipboard.writeText('${inviteLink}'); showToast('Ссылка скопирована!'); event.stopPropagation();">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>` + mList.innerHTML; 
             }
 
             document.getElementById('p-btn-contact').classList.add('hidden'); 
             document.getElementById('p-btn-block').classList.add('hidden'); 
             document.getElementById('p-btn-leave').classList.remove('hidden'); 
+            
         } else { 
             if (data.isBlocked) {
                 document.getElementById('p-status').textContent = dict[currentLang].blockedStatus; 
@@ -2380,6 +2610,7 @@
             
             const myRes = await fetch('/my-full-profile'); 
             const myData = await myRes.json(); 
+            
             updateProfileBlockBtn(myData.blocked && myData.blocked.includes(chatId)); 
         }
         
@@ -2402,12 +2633,19 @@
         } else { 
             document.getElementById('contact-custom-name').value = document.getElementById('p-name').textContent; 
             document.getElementById('custom-contact-modal').classList.remove('hidden'); 
-            setTimeout(() => document.getElementById('custom-contact-modal').classList.add('show'), 10); 
+            
+            setTimeout(() => {
+                document.getElementById('custom-contact-modal').classList.add('show');
+            }, 10); 
         } 
     }
     
     function saveContact() { 
-        socket.emit('toggle_contact', {username: viewingUserProfile, customName: document.getElementById('contact-custom-name').value.trim()}); 
+        socket.emit('toggle_contact', {
+            username: viewingUserProfile, 
+            customName: document.getElementById('contact-custom-name').value.trim()
+        }); 
+        
         closeModalOnOuterClick({target: {id: 'custom-contact-modal'}}, 'custom-contact-modal'); 
     }
     
@@ -2477,6 +2715,7 @@
                 
                 document.getElementById('group-name-input').value = viewingEntityData.name; 
                 document.getElementById('group-desc-input').value = viewingEntityData.description; 
+                
                 currentGroupAvatarBase64 = viewingEntityData.avatar; 
                 currentGroupBgBase64 = viewingEntityData.profileBg; 
                 
@@ -2519,10 +2758,14 @@
             } 
             
             modal.classList.remove('hidden'); 
-            setTimeout(() => modal.classList.add('show'), 10); 
+            setTimeout(() => {
+                modal.classList.add('show');
+            }, 10); 
         } else { 
             modal.classList.remove('show'); 
-            setTimeout(() => modal.classList.add('hidden'), 300); 
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300); 
         } 
     }
     
@@ -2566,7 +2809,15 @@
                 return; 
             } 
             
-            socket.emit('update_group_info', { id: editModeGroupId, name: name, description: desc, avatar: currentGroupAvatarBase64, profileBg: currentGroupBgBase64, profileColor: color }); 
+            socket.emit('update_group_info', { 
+                id: editModeGroupId, 
+                name: name, 
+                description: desc, 
+                avatar: currentGroupAvatarBase64, 
+                profileBg: currentGroupBgBase64, 
+                profileColor: color 
+            }); 
+            
             toggleCreateGroupModal(false); 
             showToast("Изменения сохранены"); 
             return; 
@@ -2588,7 +2839,16 @@
             return; 
         } 
         
-        socket.emit('create_group', { id: id, type: type, name: name, description: desc, avatar: currentGroupAvatarBase64, profileBg: currentGroupBgBase64, profileColor: color, members: members }); 
+        socket.emit('create_group', { 
+            id: id, 
+            type: type, 
+            name: name, 
+            description: desc, 
+            avatar: currentGroupAvatarBase64, 
+            profileBg: currentGroupBgBase64, 
+            profileColor: color, 
+            members: members 
+        }); 
     }
 
     function startReply(username, text) { 
@@ -2616,15 +2876,21 @@
         changeGlassEffect(glass); 
         
         const themeSel = document.getElementById('theme-select');
-        if (themeSel) themeSel.value = theme;
+        if (themeSel) {
+            themeSel.value = theme;
+        }
         
         const glassSel = document.getElementById('glass-select');
-        if (glassSel) glassSel.value = glass;
+        if (glassSel) {
+            glassSel.value = glass;
+        }
         
         if (currentUser && currentUser.profilePattern) {
             const patSel = document.getElementById('profile-pattern-select');
-            if (patSel) patSel.value = currentUser.profilePattern;
-        }
+            if (patSel) {
+                patSel.value = currentUser.profilePattern;
+            }
+        } 
     }
     
     function changeTheme(themeName) { 
@@ -2650,12 +2916,16 @@
     
     async function changeProfilePattern(p) { 
         document.getElementById('settings-cover-preview').className = `user-profile-preview pattern-${p}`; 
+        
         await fetch('/update-profile', { 
             method: 'POST', 
             headers: {'Content-Type': 'application/json'}, 
             body: JSON.stringify({ profilePattern: p }) 
         }); 
-        if(currentUser) currentUser.profilePattern = p; 
+        
+        if(currentUser) {
+            currentUser.profilePattern = p; 
+        }
     }
     
     function toggleSettings(show) { 
@@ -2666,22 +2936,31 @@
         const modal = document.getElementById('profile-modal'); 
         if (show) { 
             modal.classList.remove('hidden'); 
-            setTimeout(() => modal.classList.add('show'), 10); 
+            setTimeout(() => {
+                modal.classList.add('show');
+            }, 10); 
         } else { 
             modal.classList.remove('show'); 
-            setTimeout(() => modal.classList.add('hidden'), 300); 
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300); 
         } 
     }
     
     function closeProfile(e) { 
-        if (e.target.id === 'profile-modal') toggleProfileModal(false); 
+        if (e.target.id === 'profile-modal') {
+            toggleProfileModal(false); 
+        }
     }
     
     function closeModalOnOuterClick(e, modalId) { 
         if (e.target.id === modalId) { 
             const modal = document.getElementById(modalId); 
             modal.classList.remove('show'); 
-            setTimeout(() => modal.classList.add('hidden'), 300); 
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300); 
         } 
     }
     
@@ -2692,8 +2971,8 @@
         const btn = document.querySelector(`.tab-btn[onclick="switchSettingsTab('${tabId}')"]`); 
         const content = document.getElementById(`tab-${tabId}`); 
         
-        if(btn) btn.classList.add('active'); 
-        if(content) content.classList.add('active'); 
+        if (btn) btn.classList.add('active'); 
+        if (content) content.classList.add('active'); 
     }
 
     socket.on('invite_link_generated', (data) => {
@@ -2704,7 +2983,9 @@
     // --- МОБИЛЬНЫЕ ВКЛАДКИ (КОНТАКТЫ И ЗВОНКИ) ---
     function switchMobileTab(tabId, btnElement) {
         document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(btn => btn.classList.remove('active'));
-        if (btnElement) btnElement.classList.add('active');
+        if (btnElement) {
+            btnElement.classList.add('active');
+        }
         
         document.getElementById('main-container').classList.remove('chat-open');
         toggleSettings(false);
@@ -2715,8 +2996,12 @@
             document.querySelectorAll('.mobile-tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-content-' + tabId).classList.remove('hidden');
             
-            if (tabId === 'contacts') renderContactsTab();
-            if (tabId === 'calls') renderCallsTab();
+            if (tabId === 'contacts') {
+                renderContactsTab();
+            }
+            if (tabId === 'calls') {
+                renderCallsTab();
+            }
         }
     }
 
@@ -2725,14 +3010,20 @@
         container.innerHTML = '';
         
         const myContacts = currentUser.contacts || [];
+        
         if (myContacts.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><span>Здесь будут ваши контакты</span></div>';
+            container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-users"></i>
+                <span>Здесь будут ваши контакты</span>
+            </div>`;
             return;
         }
         
         myContacts.forEach(c => {
             const username = typeof c === 'object' ? c.username : c;
             const name = typeof c === 'object' && c.customName ? c.customName : username;
+            
             container.innerHTML += `
                 <div class="contact-item" onclick="viewUserProfile('${username}')">
                     <div class="avatar">${name[0].toUpperCase()}</div>
@@ -2750,7 +3041,11 @@
         container.innerHTML = '';
         
         if (!calls || calls.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="fas fa-phone-slash"></i><span>Здесь будут ваши звонки</span></div>';
+            container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-phone-slash"></i>
+                <span>Здесь будут ваши звонки</span>
+            </div>`;
             return;
         }
         
@@ -2772,7 +3067,11 @@
     });
 
     function renderCallsTab() {
-        document.getElementById('calls-list-container').innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><span>Загрузка...</span></div>';
+        document.getElementById('calls-list-container').innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span>Загрузка...</span>
+        </div>`;
         socket.emit('get_call_history');
     }
 
@@ -2788,8 +3087,12 @@
             if (currentPlayingAudio && currentPlayingAudio !== audio) { 
                 currentPlayingAudio.pause(); 
                 const oldIcon = document.getElementById('icon-' + currentPlayingAudio.id); 
-                if(oldIcon) oldIcon.className = 'fas fa-play'; 
+                
+                if(oldIcon) {
+                    oldIcon.className = 'fas fa-play'; 
+                }
             } 
+            
             audio.play(); 
             icon.className = 'fas fa-pause'; 
             currentPlayingAudio = audio; 
@@ -2807,11 +3110,17 @@
         
         if (audio && audio.duration && audio.duration !== Infinity) { 
             const percent = (audio.currentTime / audio.duration) * 100; 
-            if(progress) progress.style.width = percent + '%'; 
+            
+            if(progress) {
+                progress.style.width = percent + '%'; 
+            }
             
             const mins = Math.floor(audio.currentTime / 60); 
             const secs = Math.floor(audio.currentTime % 60); 
-            if(timeDisplay) timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; 
+            
+            if(timeDisplay) {
+                timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; 
+            }
         } 
     }
     
@@ -2822,7 +3131,10 @@
         if (audio && audio.duration && audio.duration !== Infinity) { 
             const mins = Math.floor(audio.duration / 60); 
             const secs = Math.floor(audio.duration % 60); 
-            if(timeDisplay) timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; 
+            
+            if(timeDisplay) {
+                timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`; 
+            }
         } 
     }
     
@@ -2834,7 +3146,9 @@
         if(progress) progress.style.width = '0%'; 
         
         setAudioDuration(audioId); 
-        if(currentPlayingAudio && currentPlayingAudio.id === audioId) currentPlayingAudio = null; 
+        if(currentPlayingAudio && currentPlayingAudio.id === audioId) {
+            currentPlayingAudio = null; 
+        }
     }
     
     function seekCustomAudio(e, audioId) { 
@@ -2853,8 +3167,11 @@
     }
 
     sendBtn.onclick = send; 
+    
     msgInput.onkeypress = (e) => { 
-        if(e.key === 'Enter') send(); 
+        if(e.key === 'Enter') {
+            send(); 
+        }
     };
     
     if ('serviceWorker' in navigator) {
