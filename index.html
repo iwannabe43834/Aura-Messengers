@@ -7,18 +7,18 @@
             if (window.location.pathname.length > 1) {
                 localStorage.setItem('redirect_after_login', window.location.pathname);
             }
-            window.location.href = 'auth.html'; 
+            window.location.href = '/auth.html'; 
         }
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Aura Messenger</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#8774e1">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="/style.css?v=13">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script src="/socket.io/socket.io.js"></script>
@@ -64,6 +64,7 @@
             flex-direction: column; 
             align-items: center; 
             gap: 15px; 
+            margin: auto 0;
         }
         .empty-state i { 
             font-size: 3rem; 
@@ -92,12 +93,14 @@
 </head>
 <body class="pattern-none" id="app-body" data-theme="dark" data-lang="ru">
 
-<audio id="snd-send" src="send.mp3" preload="auto"></audio>
-<audio id="snd-notify" src="notify.mp3" preload="auto"></audio>
+<audio id="snd-send" src="/send.mp3" preload="auto"></audio>
+<audio id="snd-notify" src="/notify.mp3" preload="auto"></audio>
 
 <div id="story-viewer-overlay" class="story-viewer-overlay" onclick="closeStory(event)">
     <div class="story-content-wrap" id="story-content-wrap">
-        <div class="story-progress-bar"><div class="story-progress-fill" id="story-progress-fill"></div></div>
+        <div class="story-progress-bar">
+            <div class="story-progress-fill" id="story-progress-fill"></div>
+        </div>
         <div class="story-header">
             <img id="story-viewer-avatar" src="" style="display:none; background: var(--primary);">
             <div id="story-viewer-avatar-text" class="story-avatar-text" style="display:none; width:40px;height:40px;border-radius:50%;background:var(--primary);align-items:center;justify-content:center;color:white;font-weight:bold;font-size:1.2rem;"></div>
@@ -105,8 +108,12 @@
                 <span id="story-viewer-name" style="font-size: 1.1rem; color: white;">Name</span>
                 <span id="story-viewer-time" style="font-size: 0.8rem; font-weight: normal; opacity: 0.8; color: white;">Время</span>
             </div>
-            <button class="danger-btn-small hidden" id="story-delete-btn" onclick="deleteCurrentStory()" style="margin-right: 15px; padding: 8px 12px;"><i class="fas fa-trash"></i></button>
-            <button class="story-close" onclick="closeStory(true)"><i class="fas fa-times"></i></button>
+            <button class="danger-btn-small hidden" id="story-delete-btn" onclick="deleteCurrentStory()" style="margin-right: 15px; padding: 8px 12px;">
+                <i class="fas fa-trash"></i>
+            </button>
+            <button class="story-close" onclick="closeStory(true)">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
         <img id="story-viewer-img" class="story-media hidden">
         <video id="story-viewer-vid" class="story-media hidden" autoplay playsinline></video>
@@ -137,15 +144,27 @@
         <p id="call-status-text" style="color: rgba(255,255,255,0.7); font-size: 1.2rem; margin-bottom: 40px; font-weight: 300; letter-spacing: 1px;">Звонит...</p>
         
         <div id="incoming-call-actions" class="hidden" style="display:flex; justify-content:center; gap:40px; margin-top: 20px;">
-            <button onclick="acceptCall()" style="background:#4ade80; color:#fff; border:none; border-radius:50%; width:75px; height:75px; font-size:2rem; cursor:pointer; box-shadow: 0 10px 25px rgba(74,222,128,0.4); transition: 0.2s; flex-shrink: 0;"><i class="fas fa-phone"></i></button>
-            <button onclick="rejectCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:75px; height:75px; font-size:2rem; cursor:pointer; box-shadow: 0 10px 25px rgba(255,59,48,0.4); transition: 0.2s; flex-shrink: 0;"><i class="fas fa-phone-slash"></i></button>
+            <button onclick="acceptCall()" style="background:#4ade80; color:#fff; border:none; border-radius:50%; width:75px; height:75px; font-size:2rem; cursor:pointer; box-shadow: 0 10px 25px rgba(74,222,128,0.4); transition: 0.2s; flex-shrink: 0;">
+                <i class="fas fa-phone"></i>
+            </button>
+            <button onclick="rejectCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:75px; height:75px; font-size:2rem; cursor:pointer; box-shadow: 0 10px 25px rgba(255,59,48,0.4); transition: 0.2s; flex-shrink: 0;">
+                <i class="fas fa-phone-slash"></i>
+            </button>
         </div>
 
         <div id="active-call-actions" class="hidden" style="display:flex; justify-content:center; gap:20px; position: absolute; bottom: 50px; left: 0; width: 100%; z-index: 10; padding: 20px; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);">
-            <button onclick="toggleVideo()" id="video-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;"><i class="fas fa-video"></i></button>
-            <button onclick="toggleAudio()" id="audio-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;"><i class="fas fa-microphone"></i></button>
-            <button onclick="toggleRemoteAudio()" id="remote-audio-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;" title="Замутить собеседника"><i class="fas fa-volume-up"></i></button>
-            <button onclick="endCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; box-shadow: 0 5px 15px rgba(255,59,48,0.4); transition: 0.2s; flex-shrink: 0;"><i class="fas fa-phone-slash"></i></button>
+            <button onclick="toggleVideo()" id="video-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;">
+                <i class="fas fa-video"></i>
+            </button>
+            <button onclick="toggleAudio()" id="audio-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <button onclick="toggleRemoteAudio()" id="remote-audio-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;" title="Замутить собеседника">
+                <i class="fas fa-volume-up"></i>
+            </button>
+            <button onclick="endCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; box-shadow: 0 5px 15px rgba(255,59,48,0.4); transition: 0.2s; flex-shrink: 0;">
+                <i class="fas fa-phone-slash"></i>
+            </button>
         </div>
     </div>
     
@@ -174,18 +193,30 @@
             <span onclick="contextReact('🔥')">🔥</span>
         </div>
         <div class="context-actions">
-            <button onclick="contextReply()"><i class="fas fa-reply"></i> <span data-i18n="reply">Ответить</span></button>
-            <button id="ctx-edit-btn" onclick="contextEdit()"><i class="fas fa-pencil-alt"></i> <span>Изменить</span></button>
-            <button id="ctx-pin-btn" onclick="contextPin()"><i class="fas fa-thumbtack"></i> <span>Закрепить</span></button>
-            <button class="danger" onclick="contextDelete()"><i class="fas fa-trash"></i> <span data-i18n="delete">Удалить</span></button>
+            <button onclick="contextReply()">
+                <i class="fas fa-reply"></i> <span data-i18n="reply">Ответить</span>
+            </button>
+            <button id="ctx-edit-btn" onclick="contextEdit()">
+                <i class="fas fa-pencil-alt"></i> <span>Изменить</span>
+            </button>
+            <button id="ctx-pin-btn" onclick="contextPin()">
+                <i class="fas fa-thumbtack"></i> <span>Закрепить</span>
+            </button>
+            <button class="danger" onclick="contextDelete()">
+                <i class="fas fa-trash"></i> <span data-i18n="delete">Удалить</span>
+            </button>
         </div>
     </div>
 
     <div id="profile-modal" class="modal hidden" onclick="closeProfile(event)" style="z-index: 2000;">
         <div class="modal-content tg-style-profile">
             <div class="profile-header-actions">
-                <button class="close-profile-btn" onclick="toggleProfileModal(false)"><i class="fas fa-times"></i></button>
-                <button class="admin-edit-btn hidden" id="p-btn-edit" onclick="openEditGroupModal()"><i class="fas fa-pencil-alt"></i></button>
+                <button class="close-profile-btn" onclick="toggleProfileModal(false)">
+                    <i class="fas fa-times"></i>
+                </button>
+                <button class="admin-edit-btn hidden" id="p-btn-edit" onclick="openEditGroupModal()">
+                    <i class="fas fa-pencil-alt"></i>
+                </button>
             </div>
             <div class="profile-cover pattern-none" id="p-cover"></div> 
             <div class="profile-scroll-area">
@@ -286,7 +317,9 @@
     <div id="create-group-modal" class="modal hidden" onclick="closeModalOnOuterClick(event, 'create-group-modal')" style="z-index: 2100;">
         <div class="modal-content tg-style-profile" style="padding: 20px 0; max-height: 90vh; overflow-y: auto;">
             <div class="profile-header-actions">
-                <button class="close-profile-btn" onclick="toggleCreateGroupModal(false)"><i class="fas fa-times"></i></button>
+                <button class="close-profile-btn" onclick="toggleCreateGroupModal(false)">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="profile-main-info">
                 <h2 id="modal-group-title" data-i18n="createGroup">Создать сообщество</h2>
@@ -339,7 +372,9 @@
 
     <div id="settings-drawer" class="settings-drawer">
         <div class="drawer-header">
-            <button class="back-btn" onclick="toggleSettings(false)"><i class="fas fa-arrow-left"></i></button>
+            <button class="back-btn" onclick="toggleSettings(false)">
+                <i class="fas fa-arrow-left"></i>
+            </button>
             <h3 data-i18n="settings">Настройки</h3>
         </div>
         <div class="drawer-content">
@@ -388,10 +423,14 @@
                 <div class="settings-list tab-content" id="tab-appearance">
                     <div style="display:flex; gap: 10px; margin-bottom: 10px;">
                         <input type="file" id="avatar-file-input" style="display:none" accept="image/*" onchange="uploadAvatar(this)">
-                        <button class="primary-btn-small" style="margin-top:0;" onclick="document.getElementById('avatar-file-input').click()"><i class="fas fa-camera"></i> Аватар</button>
+                        <button class="primary-btn-small" style="margin-top:0;" onclick="document.getElementById('avatar-file-input').click()">
+                            <i class="fas fa-camera"></i> Аватар
+                        </button>
                         
                         <input type="file" id="bg-file-input" style="display:none" accept="image/*,video/*" onchange="uploadProfileBg(this)">
-                        <button class="primary-btn-small" style="margin-top:0; background: var(--bg-hover); color: var(--text-main);" onclick="document.getElementById('bg-file-input').click()"><i class="fas fa-image"></i> Обложка</button>
+                        <button class="primary-btn-small" style="margin-top:0; background: var(--bg-hover); color: var(--text-main);" onclick="document.getElementById('bg-file-input').click()">
+                            <i class="fas fa-image"></i> Обложка
+                        </button>
                     </div>
 
                     <div class="settings-input-group">
@@ -482,10 +521,14 @@
     <aside class="sidebar">
         <div class="sidebar-header">
             <div class="header-top">
-                <button class="menu-btn" onclick="toggleSettings(true)"><i class="fas fa-bars"></i></button>
+                <button class="menu-btn" onclick="toggleSettings(true)">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <h2 id="logo-text">Aura</h2>
                 <div style="flex:1"></div>
-                <button class="menu-btn" onclick="toggleCreateGroupModal(true)" title="Создать"><i class="fas fa-pen-to-square"></i></button>
+                <button class="menu-btn" onclick="toggleCreateGroupModal(true)" title="Создать">
+                    <i class="fas fa-pen-to-square"></i>
+                </button>
             </div>
             <div class="search-wrapper">
                 <i class="fas fa-search"></i>
@@ -498,7 +541,9 @@
             <div id="stories-container" class="stories-container"></div>
             <div class="contacts-list">
                 <div class="saved-messages-item" onclick="openChat('me')">
-                    <div class="saved-icon"><i class="fas fa-bookmark"></i></div>
+                    <div class="saved-icon">
+                        <i class="fas fa-bookmark"></i>
+                    </div>
                     <div class="contact-info">
                         <strong data-i18n="savedMessages">Избранное</strong>
                         <div class="contact-subtext" data-i18n="savedSubtext">Личное хранилище</div>
@@ -569,13 +614,25 @@
                     </button>
                     <div id="chat-header-dropdown" class="custom-context-menu hidden" style="position: absolute; right: 0; top: 100%; margin-top: 10px; width: 240px; z-index: 100;">
                         <div class="context-actions">
-                            <button id="btn-call-audio" onclick="makeCall(false)"><i class="fas fa-phone"></i> Аудиозвонок</button>
-                            <button id="btn-call-video" onclick="makeCall(true)"><i class="fas fa-video"></i> Видеозвонок</button>
-                            <button id="btn-call-screen" onclick="startScreenShare()"><i class="fas fa-desktop"></i> Демонстрация экрана</button>
-                            <button onclick="toggleChatSearch()"><i class="fas fa-search"></i> Поиск сообщений</button>
+                            <button id="btn-call-audio" onclick="makeCall(false)">
+                                <i class="fas fa-phone"></i> Аудиозвонок
+                            </button>
+                            <button id="btn-call-video" onclick="makeCall(true)">
+                                <i class="fas fa-video"></i> Видеозвонок
+                            </button>
+                            <button id="btn-call-screen" onclick="startScreenShare()">
+                                <i class="fas fa-desktop"></i> Демонстрация экрана
+                            </button>
+                            <button onclick="toggleChatSearch()">
+                                <i class="fas fa-search"></i> Поиск сообщений
+                            </button>
                             <input type="file" id="wallpaper-upload-input" accept="image/*" style="display:none" onchange="setChatWallpaper(this)">
-                            <button onclick="document.getElementById('wallpaper-upload-input').click()"><i class="fas fa-image"></i> Изменить обои чата</button>
-                            <button onclick="resetChatWallpaper()" style="color: #ff3b30;"><i class="fas fa-trash-alt"></i> Сбросить обои</button>
+                            <button onclick="document.getElementById('wallpaper-upload-input').click()">
+                                <i class="fas fa-image"></i> Изменить обои чата
+                            </button>
+                            <button onclick="resetChatWallpaper()" style="color: #ff3b30;">
+                                <i class="fas fa-trash-alt"></i> Сбросить обои
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -583,8 +640,12 @@
 
             <div id="chat-search-bar" class="hidden" style="padding: 10px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; gap: 10px;">
                 <input type="text" id="chat-search-input" placeholder="Поиск сообщений..." style="flex:1; padding:8px 15px; border-radius:15px; border:1px solid var(--border); background:var(--bg-main); color:white; outline:none;">
-                <button style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:1.2rem;" onclick="performChatSearch()"><i class="fas fa-check"></i></button>
-                <button style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1.2rem;" onclick="toggleChatSearch()"><i class="fas fa-times"></i></button>
+                <button style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:1.2rem;" onclick="performChatSearch()">
+                    <i class="fas fa-check"></i>
+                </button>
+                <button style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1.2rem;" onclick="toggleChatSearch()">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
 
             <div id="pinned-banner" class="hidden" style="background: var(--bg-secondary); padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; cursor: pointer; z-index: 11; transition: 0.3s;">
@@ -611,8 +672,12 @@
                     <i class="fas fa-paperclip"></i>
                 </button>
                 <input type="text" id="msgInput" placeholder="Напишите сообщение..." autocomplete="off" data-i18n-placeholder="writeMessage">
-                <button id="sendBtn" class="action-btn hidden"><i class="fas fa-paper-plane"></i></button>
-                <button id="micBtn" class="action-btn"><i class="fas fa-microphone"></i></button>
+                <button id="sendBtn" class="action-btn hidden">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+                <button id="micBtn" class="action-btn">
+                    <i class="fas fa-microphone"></i>
+                </button>
 
                 <div id="record-ui" class="record-ui hidden">
                     <div class="record-timer">
@@ -877,6 +942,7 @@
         localStream = null; 
         callStartTime = null; 
         callInitiator = false;
+        
         document.getElementById('local-video').srcObject = null; 
         document.getElementById('remote-video').srcObject = null;
     }
@@ -932,6 +998,7 @@
 
     document.addEventListener('click', (e) => {
         const menu = document.getElementById('chat-header-dropdown');
+        
         if (menu && !menu.classList.contains('hidden') && !e.target.closest('#chat-header-dropdown') && !e.target.closest('.header-menu-btn')) {
             menu.classList.remove('show');
             setTimeout(() => {
@@ -1402,7 +1469,7 @@
             if (targetPath.length > 1 && !targetPath.startsWith('/join/')) {
                 const targetId = targetPath.substring(1);
                 
-                // ИГНОРИРУЕМ СИСТЕМНЫЕ ФАЙЛЫ И ПУТИ (например, index.html)
+                // ИГНОРИРУЕМ СИСТЕМНЫЕ ФАЙЛЫ И ПУТИ
                 const reservedPaths = ['index.html', 'auth.html', 'manifest.json', 'style.css', 'sw.js', 'favicon.ico'];
                 
                 if (!reservedPaths.includes(targetId) && !targetId.includes('.')) {
@@ -1685,7 +1752,7 @@
         let s = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         
         // Ссылки
-        s = s.replace(/(https?:\/\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+)/g, '<a href="$1" target="_blank" class="chat-link">$1</a>');
+        s = s.replace(/(https?:\/\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+)/g, '<a href="$1" target="_blank" class="chat-link" onclick="event.stopPropagation()">$1</a>');
         
         // Упоминания @username
         s = s.replace(/@([a-zA-Z0-9_]+)/g, '<span class="chat-mention" onclick="viewUserProfile(\'$1\'); event.stopPropagation();">@$1</span>');
