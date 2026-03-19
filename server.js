@@ -78,10 +78,9 @@ const verificationCodes = {};
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(__dirname));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-// Сессии храним в памяти, чтобы не было конфликтов при перезагрузке
+// Сессии храним в памяти
 app.use(session({
     secret: 'aura-secret-key-2026-pro',
     resave: true,
@@ -94,7 +93,10 @@ app.use(session({
 
 const USERS_FILE = path.join(__dirname, 'users.json');
 const GROUPS_FILE = path.join(__dirname, 'groups.json');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+// --- ОПТИМИЗАЦИЯ ДЛЯ RENDER (КЭШИРОВАНИЕ В ПАМЯТЬ) ---
+let usersCache = {};
+let groupsCache = {};
 
 function initFiles() {
     if (!fs.existsSync(USERS_FILE)) {
@@ -103,21 +105,29 @@ function initFiles() {
     if (!fs.existsSync(GROUPS_FILE)) {
         fs.writeFileSync(GROUPS_FILE, JSON.stringify({}));
     }
-    if (!fs.existsSync(UPLOADS_DIR)) {
-        fs.mkdirSync(UPLOADS_DIR);
+    try {
+        usersCache = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+    } catch (e) {
+        usersCache = {};
+    }
+    try {
+        groupsCache = JSON.parse(fs.readFileSync(GROUPS_FILE, 'utf8'));
+    } catch (e) {
+        groupsCache = {};
     }
 }
 
-function readData(file) {
-    try { 
-        return JSON.parse(fs.readFileSync(file, 'utf8')); 
-    } catch (e) { 
-        return {}; 
-    }
+// Асинхронное сохранение, чтобы не блокировать сервер при каждом чихе
+function saveUsers() {
+    fs.writeFile(USERS_FILE, JSON.stringify(usersCache, null, 2), (err) => {
+        if (err) console.error("Ошибка сохранения пользователей:", err);
+    });
 }
 
-function writeData(file, data) {
-    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+function saveGroups() {
+    fs.writeFile(GROUPS_FILE, JSON.stringify(groupsCache, null, 2), (err) => {
+        if (err) console.error("Ошибка сохранения групп:", err);
+    });
 }
 
 let db;
@@ -178,28 +188,9 @@ async function initDB() {
     try { await db.exec(`ALTER TABLE messages ADD COLUMN isChannelPost INTEGER DEFAULT 0`); } catch(e){}
     try { await db.exec(`ALTER TABLE messages ADD COLUMN isSystem INTEGER DEFAULT 0`); } catch(e){}
 
-    console.log("✅ База данных SQLite успешно инициализирована!");
+    console.log("✅ База данных SQLite и Кэш памяти успешно инициализированы!");
 }
 initDB();
-
-function saveBase64ToFile(base64String, extensionHint) {
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-        return null;
-    }
-    
-    const buffer = Buffer.from(matches[2], 'base64');
-    let ext = extensionHint.split('.').pop();
-    if (ext === extensionHint) {
-        ext = matches[1].split('/')[1] || 'bin'; 
-    }
-    
-    const fileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}.${ext}`;
-    const filePath = path.join(UPLOADS_DIR, fileName);
-    
-    fs.writeFileSync(filePath, buffer);
-    return `/uploads/${fileName}`;
-}
 
 // --- API ДЛЯ ПРИВЯЗКИ TELEGRAM ---
 app.get('/api/generate-tg-token', async (req, res) => {
@@ -224,15 +215,14 @@ app.get('/api/check-tg-token', async (req, res) => {
 // --- МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ ---
 app.post('/api/check-user', (req, res) => {
     const { loginId } = req.body;
-    const users = readData(USERS_FILE);
     let targetUsername = null;
     let targetUser = null;
 
-    for (const uname in users) {
+    for (const uname in usersCache) {
         if (uname.toLowerCase() === loginId.toLowerCase() || 
-           (users[uname].email && users[uname].email.toLowerCase() === loginId.toLowerCase())) {
+           (usersCache[uname].email && usersCache[uname].email.toLowerCase() === loginId.toLowerCase())) {
             targetUsername = uname;
-            targetUser = users[uname];
+            targetUser = usersCache[uname];
             break;
         }
     }
@@ -251,8 +241,7 @@ app.post('/api/check-user', (req, res) => {
 
 app.post('/api/send-auth-code', async (req, res) => {
     const { username, method, isReset } = req.body;
-    const users = readData(USERS_FILE);
-    const user = users[username];
+    const user = usersCache[username];
     
     if (!user) {
         return res.status(404).json({ error: 'Пользователь не найден' });
@@ -310,8 +299,7 @@ app.post('/api/verify-code', (req, res) => {
     }
     
     delete verificationCodes[username];
-    const users = readData(USERS_FILE);
-    const user = users[username];
+    const user = usersCache[username];
 
     if (user) { 
         req.session.username = username; 
@@ -325,15 +313,14 @@ app.post('/api/verify-code', (req, res) => {
 
 app.post('/api/login-password', async (req, res) => {
     const { loginId, password } = req.body;
-    const users = readData(USERS_FILE);
     let username = null;
     let user = null;
     
-    for (const uname in users) {
+    for (const uname in usersCache) {
         if (uname.toLowerCase() === loginId.toLowerCase() || 
-           (users[uname].email && users[uname].email.toLowerCase() === loginId.toLowerCase())) {
+           (usersCache[uname].email && usersCache[uname].email.toLowerCase() === loginId.toLowerCase())) {
             username = uname; 
-            user = users[uname]; 
+            user = usersCache[uname]; 
             break;
         }
     }
@@ -350,13 +337,12 @@ app.post('/api/login-password', async (req, res) => {
 
 app.post('/api/register-final', async (req, res) => {
     const { fullname, username, email, telegramId, password } = req.body;
-    const users = readData(USERS_FILE);
     
-    if (users[username]) {
+    if (usersCache[username]) {
         return res.status(400).json({ error: 'Этот логин уже занят' });
     }
 
-    users[username] = {
+    usersCache[username] = {
         password: await bcrypt.hash(password, 10), 
         email: email || null, 
         telegram: telegramId, 
@@ -374,7 +360,7 @@ app.post('/api/register-final', async (req, res) => {
         lastSeen: Date.now()
     };
 
-    writeData(USERS_FILE, users);
+    saveUsers();
     req.session.username = username;
     req.session.save(() => {
         res.json({ success: true, user: { username, name: fullname } });
@@ -389,9 +375,8 @@ app.post('/api/reset-password', async (req, res) => {
         return res.status(400).json({ error: 'Неверный код' });
     }
 
-    const users = readData(USERS_FILE);
-    users[username].password = await bcrypt.hash(newPassword, 10);
-    writeData(USERS_FILE, users);
+    usersCache[username].password = await bcrypt.hash(newPassword, 10);
+    saveUsers();
     
     delete verificationCodes[username];
     req.session.username = username;
@@ -411,9 +396,7 @@ app.get('/my-full-profile', (req, res) => {
         return res.status(401).json({ error: 'Not logged in' });
     }
     
-    const users = readData(USERS_FILE);
-    const user = users[sessionUser];
-    
+    const user = usersCache[sessionUser];
     if (!user) {
         return res.status(404).json({ error: 'Not found' });
     }
@@ -428,8 +411,7 @@ app.post('/update-profile', (req, res) => {
         return res.status(401).json({ error: 'Not logged in' });
     }
     
-    const users = readData(USERS_FILE);
-    const user = users[sessionUser];
+    const user = usersCache[sessionUser];
     if (!user) {
         return res.status(404).json({ error: 'Not found' });
     }
@@ -444,7 +426,7 @@ app.post('/update-profile', (req, res) => {
     if (req.body.profileColor !== undefined) user.profileColor = req.body.profileColor;
     if (req.body.privacy !== undefined) user.privacy = { ...user.privacy, ...req.body.privacy };
     
-    writeData(USERS_FILE, users);
+    saveUsers();
 
     const safeUser = { username: sessionUser, ...user };
     delete safeUser.password;
@@ -456,12 +438,10 @@ app.post('/update-profile', (req, res) => {
 app.get('/api/entity/:id', (req, res) => {
     const callerId = req.session.username || req.headers['x-user-id'];
     const id = req.params.id;
-    const users = readData(USERS_FILE);
-    const groups = readData(GROUPS_FILE);
-    const caller = users[callerId];
+    const caller = usersCache[callerId];
 
-    if (groups[id]) {
-        const group = groups[id];
+    if (groupsCache[id]) {
+        const group = groupsCache[id];
         let myRole = 'member';
         
         if (group.creator === callerId) {
@@ -490,16 +470,16 @@ app.get('/api/entity/:id', (req, res) => {
             lastSeen: null, 
             membersList: group.members.map(m => ({
                 username: m,
-                name: users[m] ? users[m].name : m,
-                avatar: users[m] ? users[m].avatar : null,
-                emojiStatus: users[m] ? users[m].emojiStatus : '',
+                name: usersCache[m] ? usersCache[m].name : m,
+                avatar: usersCache[m] ? usersCache[m].avatar : null,
+                emojiStatus: usersCache[m] ? usersCache[m].emojiStatus : '',
                 role: group.creator === m ? 'creator' : (group.admins && group.admins[m] ? 'admin' : 'member'),
                 customTitle: (group.admins && group.admins[m] && group.admins[m].title) ? group.admins[m].title : ''
             }))
         });
     }
 
-    const user = users[id];
+    const user = usersCache[id];
     if (!user) {
         return res.status(404).json({ error: 'Not found' });
     }
@@ -576,14 +556,13 @@ io.on('connection', (socket) => {
     socket.on('identify', (username) => {
         currentUsername = username;
         onlineUsers[username] = socket.id;
-        const users = readData(USERS_FILE);
         
-        if (users[username]) { 
-            users[username].lastSeen = 'online'; 
-            writeData(USERS_FILE, users); 
+        if (usersCache[username]) { 
+            usersCache[username].lastSeen = 'online'; 
+            saveUsers();
         }
         
-        const u = users[username];
+        const u = usersCache[username];
         for (let otherUser in onlineUsers) {
             let canSee = true;
             if (u && u.privacy) {
@@ -604,18 +583,16 @@ io.on('connection', (socket) => {
 
     socket.on('get_my_chats', async () => {
         if (!currentUsername) return;
-        const users = readData(USERS_FILE);
-        const groups = readData(GROUPS_FILE);
-        const myUser = users[currentUsername];
+        const myUser = usersCache[currentUsername];
         let chats = new Set();
         
         const rows = await db.all(`SELECT fromUser, toUser FROM messages WHERE fromUser = ? OR toUser = ?`, [currentUsername, currentUsername]);
         
         rows.forEach(r => {
-            if (r.fromUser === currentUsername && !groups[r.toUser]) {
+            if (r.fromUser === currentUsername && !groupsCache[r.toUser]) {
                 chats.add(r.toUser);
             }
-            if (r.toUser === currentUsername && !groups[r.fromUser]) {
+            if (r.toUser === currentUsername && !groupsCache[r.fromUser]) {
                 chats.add(r.fromUser);
             }
         });
@@ -627,8 +604,8 @@ io.on('connection', (socket) => {
         chats.delete(currentUsername);
         let chatsArray = Array.from(chats);
 
-        for (const groupId in groups) {
-            if (groups[groupId].members.includes(currentUsername)) {
+        for (const groupId in groupsCache) {
+            if (groupsCache[groupId].members.includes(currentUsername)) {
                 chatsArray.push(groupId);
             }
         }
@@ -646,15 +623,13 @@ io.on('connection', (socket) => {
         if (!currentUsername) return;
         const chatWith = data.chatWith;
         const offset = data.offset || 0; 
-        const groups = readData(GROUPS_FILE);
-        const users = readData(USERS_FILE);
-        const myUser = users[currentUsername];
+        const myUser = usersCache[currentUsername];
 
         let historyRows = [];
         
         if (chatWith === 'me') {
             historyRows = await db.all(`SELECT * FROM messages WHERE fromUser = ? AND toUser = 'me' ORDER BY id DESC LIMIT 40 OFFSET ?`, [currentUsername, offset]);
-        } else if (groups[chatWith]) {
+        } else if (groupsCache[chatWith]) {
             historyRows = await db.all(`SELECT * FROM messages WHERE toUser = ? ORDER BY id DESC LIMIT 40 OFFSET ?`, [chatWith, offset]);
             if (offset === 0) {
                 const pinnedRow = await db.get(`SELECT * FROM messages WHERE toUser = ? AND isPinned = 1 ORDER BY id DESC LIMIT 1`, [chatWith]);
@@ -678,12 +653,12 @@ io.on('connection', (socket) => {
             let isAdmin = false;
             let customTitle = '';
             
-            if (users[r.fromUser]) {
-                emojiStatus = users[r.fromUser].emojiStatus || '';
+            if (usersCache[r.fromUser]) {
+                emojiStatus = usersCache[r.fromUser].emojiStatus || '';
             }
 
-            if (groups[chatWith]) {
-                const g = groups[chatWith];
+            if (groupsCache[chatWith]) {
+                const g = groupsCache[chatWith];
                 if (g.creator === r.fromUser) {
                     isAdmin = true;
                     customTitle = 'Создатель';
@@ -693,12 +668,12 @@ io.on('connection', (socket) => {
                 }
             }
 
-            if (r.fromUser !== currentUsername && groups[chatWith]) {
+            if (r.fromUser !== currentUsername && groupsCache[chatWith]) {
                 const contactObj = myUser.contacts ? myUser.contacts.find(c => (typeof c === 'object' ? c.username : c) === r.fromUser) : null;
                 if (contactObj && typeof contactObj === 'object' && contactObj.customName) {
                     fromDisplayName = contactObj.customName;
-                } else if (users[r.fromUser] && users[r.fromUser].name) {
-                    fromDisplayName = users[r.fromUser].name;
+                } else if (usersCache[r.fromUser] && usersCache[r.fromUser].name) {
+                    fromDisplayName = usersCache[r.fromUser].name;
                 }
             }
 
@@ -729,11 +704,10 @@ io.on('connection', (socket) => {
 
     socket.on('search_chat', async (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
         let query = `%${data.query}%`;
         let historyRows = [];
 
-        if (groups[data.chatWith]) {
+        if (groupsCache[data.chatWith]) {
             historyRows = await db.all(`SELECT * FROM messages WHERE toUser = ? AND text LIKE ? ORDER BY id DESC LIMIT 100`, [data.chatWith, query]);
         } else {
             historyRows = await db.all(`SELECT * FROM messages WHERE ((fromUser = ? AND toUser = ?) OR (fromUser = ? AND toUser = ?)) AND text LIKE ? ORDER BY id DESC LIMIT 100`, 
@@ -757,18 +731,16 @@ io.on('connection', (socket) => {
 
     socket.on('private_msg', async (data) => {
         if (!currentUsername) return;
-        
-        const groups = readData(GROUPS_FILE);
 
-        if (groups[data.to]) {
-            const g = groups[data.to];
+        if (groupsCache[data.to]) {
+            const g = groupsCache[data.to];
             if (g.muted && g.muted[currentUsername]) {
                 if (Date.now() < g.muted[currentUsername]) {
                     socket.emit('error_msg', 'Вы временно заглушены в этом чате модератором.');
                     return;
                 } else {
                     delete g.muted[currentUsername];
-                    writeData(GROUPS_FILE, groups);
+                    saveGroups();
                 }
             }
             
@@ -781,19 +753,13 @@ io.on('connection', (socket) => {
         }
 
         const msgId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-        let finalMediaData = null;
         
-        if (data.media && data.media.data && data.media.data.startsWith('data:')) {
-            finalMediaData = saveBase64ToFile(data.media.data, data.media.name);
-            data.media.data = finalMediaData;
-        }
-
         let isChannelPost = false;
         let customTitle = '';
         let isAdmin = false;
         
-        if (groups[data.to]) {
-            const g = groups[data.to];
+        if (groupsCache[data.to]) {
+            const g = groupsCache[data.to];
             if (g.type === 'channel') {
                 isChannelPost = true;
             }
@@ -825,14 +791,17 @@ io.on('connection', (socket) => {
             customTitle: customTitle
         };
 
+        // Сохраняем медиа напрямую в БД (чтобы Render не удалял файлы из /uploads)
+        let mediaType = msg.media ? msg.media.type : null;
+        let mediaData = msg.media ? msg.media.data : null;
+        let mediaName = msg.media ? msg.media.name : null;
+
         await db.run(`INSERT INTO messages 
             (id, fromUser, toUser, text, mediaType, mediaData, mediaName, replyData, time, isRead, isEdited, isPinned, reactions, deletedFor, views, isChannelPost, isSystem) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '{}', '[]', ?, ?, 0)`,
             [
                 msg.id, msg.from, msg.to, msg.text,
-                msg.media ? msg.media.type : null,
-                msg.media ? msg.media.data : null,
-                msg.media ? msg.media.name : null,
+                mediaType, mediaData, mediaName,
                 msg.reply ? JSON.stringify(msg.reply) : null,
                 msg.time,
                 JSON.stringify(msg.views),
@@ -840,17 +809,15 @@ io.on('connection', (socket) => {
             ]
         );
 
-        const users = readData(USERS_FILE);
-        const myUser = users[currentUsername];
-        
+        const myUser = usersCache[currentUsername];
         msg.emojiStatus = myUser.emojiStatus || '';
 
-        if (groups[data.to]) {
-            groups[data.to].members.forEach(memberUsername => {
+        if (groupsCache[data.to]) {
+            groupsCache[data.to].members.forEach(memberUsername => {
                 if (memberUsername === currentUsername) {
                     socket.emit('msg_receive', msg);
                 } else if (onlineUsers[memberUsername]) {
-                    const memberUser = users[memberUsername];
+                    const memberUser = usersCache[memberUsername];
                     let fromDisplayName = currentUsername;
                     
                     if (memberUser && memberUser.contacts) {
@@ -867,8 +834,8 @@ io.on('connection', (socket) => {
         } else {
             socket.emit('msg_receive', msg);
             if (data.to !== 'me' && data.to !== currentUsername && onlineUsers[data.to]) {
-                const recipient = users[data.to];
-                if (!(recipient.blocked && recipient.blocked.includes(currentUsername))) {
+                const recipient = usersCache[data.to];
+                if (!(recipient && recipient.blocked && recipient.blocked.includes(currentUsername))) {
                     io.to(onlineUsers[data.to]).emit('msg_receive', msg);
                 }
             }
@@ -896,10 +863,9 @@ io.on('connection', (socket) => {
 
     socket.on('pin_msg', async (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
         
-        if (groups[data.chatId]) {
-            const g = groups[data.chatId];
+        if (groupsCache[data.chatId]) {
+            const g = groupsCache[data.chatId];
             if (g.creator !== currentUsername && (!g.admins || !g.admins[currentUsername])) {
                 socket.emit('error_msg', 'Только администраторы могут закреплять сообщения');
                 return;
@@ -919,9 +885,7 @@ io.on('connection', (socket) => {
 
     socket.on('mark_read', async (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        
-        if (groups[data.chatWith]) {
+        if (groupsCache[data.chatWith]) {
             await db.run(`UPDATE messages SET isRead = 1 WHERE toUser = ? AND fromUser != ? AND isRead = 0`, [data.chatWith, currentUsername]);
         } else {
             const rows = await db.all(`SELECT fromUser FROM messages WHERE fromUser = ? AND toUser = ? AND isRead = 0`, [data.chatWith, currentUsername]);
@@ -935,27 +899,25 @@ io.on('connection', (socket) => {
     });
 
     socket.on('typing', (data) => {
-        const groups = readData(GROUPS_FILE);
-        if (groups[data.to] && groups[data.to].type !== 'channel') {
-            groups[data.to].members.forEach(member => {
+        if (groupsCache[data.to] && groupsCache[data.to].type !== 'channel') {
+            groupsCache[data.to].members.forEach(member => {
                 if (member !== currentUsername && onlineUsers[member]) {
                     io.to(onlineUsers[member]).emit('user_typing', { from: currentUsername, to: data.to });
                 }
             });
-        } else if (onlineUsers[data.to] && !groups[data.to]) {
+        } else if (onlineUsers[data.to] && !groupsCache[data.to]) {
             io.to(onlineUsers[data.to]).emit('user_typing', { from: currentUsername, to: currentUsername });
         }
     });
 
     socket.on('stop_typing', (data) => {
-        const groups = readData(GROUPS_FILE);
-        if (groups[data.to] && groups[data.to].type !== 'channel') {
-            groups[data.to].members.forEach(member => {
+        if (groupsCache[data.to] && groupsCache[data.to].type !== 'channel') {
+            groupsCache[data.to].members.forEach(member => {
                 if (member !== currentUsername && onlineUsers[member]) {
                     io.to(onlineUsers[member]).emit('user_stop_typing', { from: currentUsername, to: data.to });
                 }
             });
-        } else if (onlineUsers[data.to] && !groups[data.to]) {
+        } else if (onlineUsers[data.to] && !groupsCache[data.to]) {
             io.to(onlineUsers[data.to]).emit('user_stop_typing', { from: currentUsername, to: currentUsername });
         }
     });
@@ -966,22 +928,17 @@ io.on('connection', (socket) => {
         const id = Date.now().toString();
         const expiresAt = Date.now() + 24 * 60 * 60 * 1000; 
         
-        let finalMediaData = null;
-        if (data.mediaData.startsWith('data:')) {
-            finalMediaData = saveBase64ToFile(data.mediaData, 'story.jpg');
-        }
-        
+        // Сохраняем медиа напрямую в БД
         await db.run('INSERT INTO stories (id, username, mediaData, mediaType, createdAt, expiresAt, views, reactions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
-            [id, currentUsername, finalMediaData || data.mediaData, data.mediaType, Date.now(), expiresAt, '[]', '{}']);
+            [id, currentUsername, data.mediaData, data.mediaType, Date.now(), expiresAt, '[]', '{}']);
         
-        const users = readData(USERS_FILE);
         const storyObj = { 
             id: id, 
             username: currentUsername, 
-            media: finalMediaData || data.mediaData, 
+            media: data.mediaData, 
             type: data.mediaType,
-            userAvatar: users[currentUsername] ? users[currentUsername].avatar : null,
-            profileColor: users[currentUsername] ? users[currentUsername].profileColor : 'var(--primary)',
+            userAvatar: usersCache[currentUsername] ? usersCache[currentUsername].avatar : null,
+            profileColor: usersCache[currentUsername] ? usersCache[currentUsername].profileColor : 'var(--primary)',
             views: [],
             reactions: {}
         };
@@ -991,7 +948,7 @@ io.on('connection', (socket) => {
         for (let otherUser in onlineUsers) {
             if (otherUser === currentUsername) continue;
             
-            const otherU = users[otherUser];
+            const otherU = usersCache[otherUser];
             let canSee = false;
             
             if (otherU && otherU.contacts && otherU.contacts.some(c => (typeof c === 'object' ? c.username : c) === currentUsername)) {
@@ -1014,8 +971,7 @@ io.on('connection', (socket) => {
         
         await db.run('DELETE FROM stories WHERE expiresAt < ?', [Date.now()]);
         
-        const users = readData(USERS_FILE);
-        const myUser = users[currentUsername];
+        const myUser = usersCache[currentUsername];
         
         let allowedAuthors = new Set();
         allowedAuthors.add(currentUsername); 
@@ -1040,9 +996,9 @@ io.on('connection', (socket) => {
                 type: s.mediaType, 
                 views: s.views ? JSON.parse(s.views) : [],
                 reactions: s.reactions ? JSON.parse(s.reactions) : {},
-                userAvatar: users[s.username] ? users[s.username].avatar : null,
-                emojiStatus: users[s.username] ? users[s.username].emojiStatus : '',
-                profileColor: users[s.username] ? users[s.username].profileColor : 'var(--primary)'
+                userAvatar: usersCache[s.username] ? usersCache[s.username].avatar : null,
+                emojiStatus: usersCache[s.username] ? usersCache[s.username].emojiStatus : '',
+                profileColor: usersCache[s.username] ? usersCache[s.username].profileColor : 'var(--primary)'
             }));
         
         socket.emit('stories_data', enrichedStories);
@@ -1085,37 +1041,35 @@ io.on('connection', (socket) => {
 
     socket.on('toggle_contact', (data) => {
         if (!currentUsername) return;
-        const users = readData(USERS_FILE);
-        if (!users[currentUsername].contacts) {
-            users[currentUsername].contacts = [];
+        if (!usersCache[currentUsername].contacts) {
+            usersCache[currentUsername].contacts = [];
         }
-        let contacts = users[currentUsername].contacts.filter(c => (typeof c === 'object' ? c.username : c) !== data.username);
+        let contacts = usersCache[currentUsername].contacts.filter(c => (typeof c === 'object' ? c.username : c) !== data.username);
         
         if (!data.remove) {
             contacts.push({ username: data.username, customName: data.customName || data.username });
         }
-        users[currentUsername].contacts = contacts;
-        writeData(USERS_FILE, users);
+        usersCache[currentUsername].contacts = contacts;
+        saveUsers();
         socket.emit('contact_toggled', { username: data.username, inContacts: !data.remove });
     });
 
     socket.on('toggle_block', (data) => {
         if (!currentUsername) return;
-        const users = readData(USERS_FILE);
-        if (!users[currentUsername].blocked) {
-            users[currentUsername].blocked = [];
+        if (!usersCache[currentUsername].blocked) {
+            usersCache[currentUsername].blocked = [];
         }
-        const idx = users[currentUsername].blocked.indexOf(data.username);
+        const idx = usersCache[currentUsername].blocked.indexOf(data.username);
         let isBlocked = false;
         
         if (idx === -1) { 
-            users[currentUsername].blocked.push(data.username); 
+            usersCache[currentUsername].blocked.push(data.username); 
             isBlocked = true; 
         } else { 
-            users[currentUsername].blocked.splice(idx, 1); 
+            usersCache[currentUsername].blocked.splice(idx, 1); 
         }
         
-        writeData(USERS_FILE, users);
+        saveUsers();
         socket.emit('block_toggled', { username: data.username, isBlocked });
         
         if (onlineUsers[data.username]) {
@@ -1125,15 +1079,14 @@ io.on('connection', (socket) => {
 
     socket.on('update_group_info', (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        if (groups[data.id] && (groups[data.id].creator === currentUsername || (groups[data.id].admins && groups[data.id].admins[currentUsername]))) {
-            if (data.name) groups[data.id].name = data.name;
-            if (data.description !== undefined) groups[data.id].description = data.description;
-            if (data.avatar !== undefined) groups[data.id].avatar = data.avatar;
-            if (data.profileBg !== undefined) groups[data.id].profileBg = data.profileBg;
-            if (data.profileColor !== undefined) groups[data.id].profileColor = data.profileColor;
-            if (data.emojiStatus !== undefined) groups[data.id].emojiStatus = data.emojiStatus;
-            writeData(GROUPS_FILE, groups);
+        if (groupsCache[data.id] && (groupsCache[data.id].creator === currentUsername || (groupsCache[data.id].admins && groupsCache[data.id].admins[currentUsername]))) {
+            if (data.name) groupsCache[data.id].name = data.name;
+            if (data.description !== undefined) groupsCache[data.id].description = data.description;
+            if (data.avatar !== undefined) groupsCache[data.id].avatar = data.avatar;
+            if (data.profileBg !== undefined) groupsCache[data.id].profileBg = data.profileBg;
+            if (data.profileColor !== undefined) groupsCache[data.id].profileColor = data.profileColor;
+            if (data.emojiStatus !== undefined) groupsCache[data.id].emojiStatus = data.emojiStatus;
+            saveGroups();
             io.emit('group_updated', { groupId: data.id });
         }
     });
@@ -1141,40 +1094,37 @@ io.on('connection', (socket) => {
     // АДМИН ПАНЕЛЬ: Выдача прав
     socket.on('promote_admin', (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        const g = groups[data.groupId];
+        const g = groupsCache[data.groupId];
         if (g && g.creator === currentUsername) {
             if (!g.admins) {
                 g.admins = {};
             }
             g.admins[data.userId] = { title: data.title || 'Админ' };
-            writeData(GROUPS_FILE, groups);
+            saveGroups();
             io.emit('group_updated', { groupId: data.groupId });
         }
     });
 
     socket.on('demote_admin', (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        const g = groups[data.groupId];
+        const g = groupsCache[data.groupId];
         if (g && g.creator === currentUsername && g.admins) {
             delete g.admins[data.userId];
-            writeData(GROUPS_FILE, groups);
+            saveGroups();
             io.emit('group_updated', { groupId: data.groupId });
         }
     });
 
     socket.on('mute_user', (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        const g = groups[data.groupId];
+        const g = groupsCache[data.groupId];
         if (g && (g.creator === currentUsername || (g.admins && g.admins[currentUsername]))) {
             if (g.creator === data.userId) return; // Нельзя замутить создателя
             if (!g.muted) {
                 g.muted = {};
             }
             g.muted[data.userId] = Date.now() + (data.hours * 60 * 60 * 1000);
-            writeData(GROUPS_FILE, groups);
+            saveGroups();
             io.emit('group_updated', { groupId: data.groupId });
         }
     });
@@ -1182,12 +1132,11 @@ io.on('connection', (socket) => {
     // ГЕНЕРАЦИЯ ИНВАЙТ ССЫЛОК
     socket.on('generate_invite_link', (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        const g = groups[data.groupId];
+        const g = groupsCache[data.groupId];
         if (g && (g.creator === currentUsername || (g.admins && g.admins[currentUsername]))) {
             const hash = Math.random().toString(36).substr(2, 10);
             g.inviteHash = hash;
-            writeData(GROUPS_FILE, groups);
+            saveGroups();
             socket.emit('invite_link_generated', { groupId: data.groupId, hash: hash });
         }
     });
@@ -1195,12 +1144,11 @@ io.on('connection', (socket) => {
     // ВХОД ПО ИНВАЙТ ССЫЛКЕ
     socket.on('join_by_hash', async (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
         let targetGroup = null;
         
-        for (let g in groups) {
-            if (groups[g].inviteHash === data.hash) { 
-                targetGroup = groups[g]; 
+        for (let g in groupsCache) {
+            if (groupsCache[g].inviteHash === data.hash) { 
+                targetGroup = groupsCache[g]; 
                 break; 
             }
         }
@@ -1208,7 +1156,7 @@ io.on('connection', (socket) => {
         if (targetGroup) {
             if (!targetGroup.members.includes(currentUsername)) {
                 targetGroup.members.push(currentUsername);
-                writeData(GROUPS_FILE, groups);
+                saveGroups();
 
                 const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
                 const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1229,10 +1177,8 @@ io.on('connection', (socket) => {
 
     socket.on('create_group', async (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        const users = readData(USERS_FILE);
         
-        if (groups[data.id]) { 
+        if (groupsCache[data.id]) { 
             socket.emit('error_msg', 'Группа с таким ID уже существует'); 
             return; 
         }
@@ -1240,7 +1186,7 @@ io.on('connection', (socket) => {
         let allowedMembers = [currentUsername];
         data.members.forEach(memberId => {
             if (memberId === currentUsername) return;
-            const u = users[memberId];
+            const u = usersCache[memberId];
             
             if (u && u.privacy && u.privacy.groups === 'contacts') {
                 const amIContact = u.contacts && u.contacts.some(c => (typeof c === 'object' ? c.username : c) === currentUsername);
@@ -1253,7 +1199,7 @@ io.on('connection', (socket) => {
         });
 
         let members = [...new Set(allowedMembers)].slice(0, 100);
-        groups[data.id] = { 
+        groupsCache[data.id] = { 
             id: data.id, 
             type: data.type || 'group', 
             name: data.name, 
@@ -1268,7 +1214,7 @@ io.on('connection', (socket) => {
             muted: {}
         };
         
-        writeData(GROUPS_FILE, groups);
+        saveGroups();
         socket.emit('group_created', { groupId: data.id });
 
         const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
@@ -1287,26 +1233,24 @@ io.on('connection', (socket) => {
 
     socket.on('leave_group', async (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        if (groups[data.groupId]) {
-            groups[data.groupId].members = groups[data.groupId].members.filter(m => m !== currentUsername);
+        if (groupsCache[data.groupId]) {
+            groupsCache[data.groupId].members = groupsCache[data.groupId].members.filter(m => m !== currentUsername);
             
             const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.groupId, 'покинул(а) чат', timeStr]);
             io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.groupId, text: 'покинул(а) чат', time: timeStr, isSystem: true, isChannelPost: false });
 
-            if (groups[data.groupId].members.length === 0) {
-                delete groups[data.groupId];
+            if (groupsCache[data.groupId].members.length === 0) {
+                delete groupsCache[data.groupId];
             }
-            writeData(GROUPS_FILE, groups);
+            saveGroups();
             socket.emit('get_my_chats');
         }
     });
 
     socket.on('delete_msg', async (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE); 
         const msg = await db.get(`SELECT * FROM messages WHERE id = ?`, [data.id]);
         
         if (msg) {
@@ -1314,8 +1258,8 @@ io.on('connection', (socket) => {
             
             // Проверка прав на удаление ЧУЖОГО сообщения в группе
             let hasAdminRights = false;
-            if (groups[recipient] && msg.fromUser !== currentUsername) {
-                const g = groups[recipient];
+            if (groupsCache[recipient] && msg.fromUser !== currentUsername) {
+                const g = groupsCache[recipient];
                 if (g.creator === currentUsername || (g.admins && g.admins[currentUsername])) {
                     hasAdminRights = true;
                 }
@@ -1323,8 +1267,8 @@ io.on('connection', (socket) => {
 
             if ((data.forEveryone && msg.fromUser === currentUsername) || hasAdminRights) {
                 await db.run(`DELETE FROM messages WHERE id = ?`, [data.id]);
-                if (groups[recipient]) { 
-                    groups[recipient].members.forEach(member => { 
+                if (groupsCache[recipient]) { 
+                    groupsCache[recipient].members.forEach(member => { 
                         if (onlineUsers[member]) {
                             io.to(onlineUsers[member]).emit('msg_deleted', { id: data.id }); 
                         }
@@ -1348,14 +1292,13 @@ io.on('connection', (socket) => {
 
     socket.on('kick_member', async (data) => {
         if (!currentUsername) return;
-        const groups = readData(GROUPS_FILE);
-        const g = groups[data.groupId];
+        const g = groupsCache[data.groupId];
         
         if (g && (g.creator === currentUsername || (g.admins && g.admins[currentUsername]))) {
             if (g.creator === data.userId) return; // Нельзя кикнуть создателя
 
             g.members = g.members.filter(m => m !== data.userId);
-            writeData(GROUPS_FILE, groups);
+            saveGroups();
             
             const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1372,13 +1315,12 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         if (currentUsername) {
-            const users = readData(USERS_FILE); 
             const now = Date.now();
-            let u = users[currentUsername];
+            let u = usersCache[currentUsername];
             
             if (u) { 
                 u.lastSeen = now; 
-                writeData(USERS_FILE, users); 
+                saveUsers(); 
             }
             
             delete onlineUsers[currentUsername];
@@ -1417,7 +1359,9 @@ app.get('/join/:hash', (req, res) => {
 
 app.get('/:id', (req, res, next) => {
     const id = req.params.id;
-    const reserved = ['api', 'socket.io', 'uploads', 'peerjs', 'join', 'auth.html', 'index.html', 'manifest.json', 'style.css', 'sw.js', 'favicon.ico'];
+    
+    // Игнорируем системные запросы и файлы с расширениями
+    const reserved = ['api', 'socket.io', 'uploads', 'peerjs', 'join', 'auth.html', 'index.html', 'manifest.json', 'style.css', 'sw.js', 'favicon.ico', 'send.mp3', 'notify.mp3'];
     
     if (id.includes('.') || reserved.includes(id)) {
         return next();
@@ -1427,5 +1371,5 @@ app.get('/:id', (req, res, next) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => { 
-    console.log(`🚀 Сервер запущен на порту ${PORT}.`); 
+    console.log(`🚀 Сервер запущен на порту ${PORT}. Telegram бот и сервер звонков активны.`); 
 });
