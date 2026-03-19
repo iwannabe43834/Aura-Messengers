@@ -1,6 +1,6 @@
 /* =========================================
    AURA MESSENGER - ULTIMATE PREMIUM STYLE 
-   (STORIES, WALLPAPERS, LIQUID GLASS & ANIMATIONS)
+   (STORIES, RAVE CINEMA, WALLPAPERS, LIQUID GLASS & ANIMATIONS)
    ========================================= */
 
 :root {
@@ -222,7 +222,8 @@ body {
 .header-top {
     display: flex;
     align-items: center;
-    gap: 15px;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 .header-top h2 {
@@ -231,6 +232,12 @@ body {
     display: flex;
     align-items: center;
     gap: 5px;
+}
+
+.header-top-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
 }
 
 .menu-btn {
@@ -247,6 +254,26 @@ body {
 .menu-btn:hover {
     background: var(--bg-secondary);
     color: var(--primary);
+}
+
+.btn-rave-create { 
+    color: #ff3b30 !important; 
+    background: rgba(255, 59, 48, 0.1); 
+    border-radius: 12px; 
+    padding: 6px 12px; 
+    font-size: 1rem; 
+    display: flex; 
+    align-items: center; 
+    gap: 6px; 
+    cursor: pointer; 
+    border: none;
+    font-weight: bold;
+    transition: all 0.2s var(--spring-soft);
+}
+
+.btn-rave-create:hover { 
+    background: rgba(255, 59, 48, 0.2); 
+    transform: translateY(-2px); 
 }
 
 .search-wrapper {
@@ -280,6 +307,37 @@ body {
     background: var(--bg-sidebar);
 }
 
+/* --- Вкладки и пустые состояния --- */
+.mobile-tab-content { 
+    display: flex; 
+    flex-direction: column; 
+    flex: 1; 
+    overflow-y: auto; 
+    overflow-x: hidden;
+    animation: fadeInTab 0.3s var(--spring-soft); 
+}
+
+.mobile-tab-content.hidden { display: none !important; }
+
+@keyframes fadeInTab {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.empty-state { 
+    padding: 40px 20px; 
+    text-align: center; 
+    color: var(--text-dim); 
+    font-size: 1.1rem; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    gap: 15px; 
+    margin: auto 0; 
+}
+
+.empty-state i { font-size: 3rem; opacity: 0.5; }
+
 /* --- ИСТОРИИ (STORIES) --- */
 .stories-container {
     display: flex;
@@ -288,6 +346,7 @@ body {
     overflow-x: auto;
     border-bottom: 1px solid var(--border);
     scroll-behavior: smooth;
+    flex-shrink: 0;
 }
 
 .stories-container::-webkit-scrollbar {
@@ -694,6 +753,20 @@ body {
     transition: background 0.3s, border-color 0.3s;
 }
 
+.header-menu-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 5px 10px;
+    transition: color 0.2s;
+}
+
+.header-menu-btn:hover {
+    color: var(--primary);
+}
+
 /* ПРОЗРАЧНОСТЬ ШАПКИ И ФУТЕРА ПРИ ОБОЯХ */
 .chat-area.has-wallpaper .chat-header {
     background: rgba(20, 25, 35, 0.65) !important;
@@ -907,7 +980,7 @@ body {
 .media-video { max-width: 100%; margin-top: 5px; border-radius: 12px; outline: none; }
 
 /* =========================================
-   СИСТЕМНОЕ СООБЩЕНИЕ (ОКОНЧАНИЕ ЗВОНКА)
+   СИСТЕМНОЕ СООБЩЕНИЕ (ОКОНЧАНИЕ ЗВОНКА И ПЛАШКИ)
    ========================================= */
 .system-call-msg {
     display: flex;
@@ -1623,6 +1696,44 @@ body {
 [data-glass="on"] .tab-btn { background: transparent; border: none; border-radius: 12px; transition: 0.3s; color: var(--text-dim); }
 [data-glass="on"] .tab-btn.active { background: rgba(255,255,255,0.15); color: var(--text-main); box-shadow: 0 4px 10px rgba(0,0,0,0.1), inset 0 1px 1px var(--glass-highlight); }
 [data-glass="on"] .type-selector input:checked + label { background: rgba(135, 116, 225, 0.4); border-color: rgba(255,255,255,0.2); }
+
+/* --- СТИЛИ КИНОЗАЛА (RAVE) ДЛЯ ЖИДКОГО СТЕКЛА --- */
+[data-glass="on"] .rave-container {
+    background: transparent;
+    border-bottom: none;
+    padding: 10px;
+}
+
+[data-glass="on"] .rave-video-wrapper {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border-radius: 24px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4), inset 0 1px 1px var(--glass-highlight);
+    overflow: hidden;
+}
+
+[data-glass="on"] .rave-host-controls {
+    background: var(--glass-bg);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border-radius: 24px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 1px 1px var(--glass-highlight);
+    margin-top: 10px;
+}
+
+[data-glass="on"] #rave-html-player {
+    border-radius: 24px;
+}
+
+[data-glass="on"] .rave-search-card {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+}
 
 /* =========================================
    КРАСИВЫЙ ЭКРАН ЗВОНКА (ГРАДИЕНТЫ И ПУЛЬСАЦИЯ)
