@@ -78,6 +78,7 @@ const verificationCodes = {};
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(__dirname));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // Сессии храним в памяти
@@ -105,11 +106,13 @@ function initFiles() {
     if (!fs.existsSync(GROUPS_FILE)) {
         fs.writeFileSync(GROUPS_FILE, JSON.stringify({}));
     }
+    
     try {
         usersCache = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
     } catch (e) {
         usersCache = {};
     }
+    
     try {
         groupsCache = JSON.parse(fs.readFileSync(GROUPS_FILE, 'utf8'));
     } catch (e) {
@@ -117,7 +120,7 @@ function initFiles() {
     }
 }
 
-// Асинхронное сохранение, чтобы не блокировать сервер при каждом чихе
+// Асинхронное сохранение для предотвращения зависаний
 function saveUsers() {
     fs.writeFile(USERS_FILE, JSON.stringify(usersCache, null, 2), (err) => {
         if (err) console.error("Ошибка сохранения пользователей:", err);
@@ -791,7 +794,6 @@ io.on('connection', (socket) => {
             customTitle: customTitle
         };
 
-        // Сохраняем медиа напрямую в БД (чтобы Render не удалял файлы из /uploads)
         let mediaType = msg.media ? msg.media.type : null;
         let mediaData = msg.media ? msg.media.data : null;
         let mediaName = msg.media ? msg.media.name : null;
@@ -885,6 +887,7 @@ io.on('connection', (socket) => {
 
     socket.on('mark_read', async (data) => {
         if (!currentUsername) return;
+        
         if (groupsCache[data.chatWith]) {
             await db.run(`UPDATE messages SET isRead = 1 WHERE toUser = ? AND fromUser != ? AND isRead = 0`, [data.chatWith, currentUsername]);
         } else {
@@ -928,7 +931,6 @@ io.on('connection', (socket) => {
         const id = Date.now().toString();
         const expiresAt = Date.now() + 24 * 60 * 60 * 1000; 
         
-        // Сохраняем медиа напрямую в БД
         await db.run('INSERT INTO stories (id, username, mediaData, mediaType, createdAt, expiresAt, views, reactions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
             [id, currentUsername, data.mediaData, data.mediaType, Date.now(), expiresAt, '[]', '{}']);
         
