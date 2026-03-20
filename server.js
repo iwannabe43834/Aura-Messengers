@@ -9,7 +9,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const { ExpressPeerServer } = require('peer');
-const ytSearch = require('yt-search'); // <-- ДОБАВЛЕН ПОИСК YOUTUBE
+const ytSearch = require('yt-search');
 
 const app = express();
 const server = http.createServer(app);
@@ -545,6 +545,25 @@ app.get('/api/entity/:id', (req, res) => {
 
 const onlineUsers = {}; 
 
+function emitToGroup(groupId, event, payload) {
+    const g = groupsCache[groupId];
+    if (g && g.members) {
+        g.members.forEach(m => {
+            if (onlineUsers[m]) {
+                io.to(onlineUsers[m]).emit(event, payload);
+            }
+        });
+    }
+}
+
+function emitToUsers(userIds, event, payload) {
+    userIds.forEach(m => {
+        if (onlineUsers[m]) {
+            io.to(onlineUsers[m]).emit(event, payload);
+        }
+    });
+}
+
 io.on('connection', (socket) => {
     let currentUsername = null;
 
@@ -834,8 +853,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- ЛОГИКА ПОИСКА ВИДЕО ДЛЯ RAVE ---
-    // --- ПОЛНЫЙ И ИСПРАВЛЕННЫЙ БЛОК ПОИСКА ВИДЕО ДЛЯ RAVE ---
     socket.on('rave_search_video', async (data) => {
         if (!currentUsername) return;
         
@@ -910,9 +927,8 @@ io.on('connection', (socket) => {
             socket.emit('error_msg', 'Ошибка при поиске видео');
             socket.emit('rave_search_results', { platform: data.platform, results: [] });
         }
-    }); // <-- ТУТ ЗАКРЫВАЕТСЯ СОБЫТИЕ
+    });
 
-    // --- ЛОГИКА RAVE (КИНОЗАЛА) УПРАВЛЕНИЕ ---
     socket.on('rave_update_state', (data) => {
         if (!currentUsername) return;
         const g = groupsCache[data.groupId];
@@ -920,6 +936,10 @@ io.on('connection', (socket) => {
         
         if (g.raveState.host !== currentUsername && data.action !== 'sync_request' && data.action !== 'sync_response') return;
         
+        const broadcastRaveState = () => {
+            emitToGroup(data.groupId, 'rave_state_updated', { groupId: data.groupId, state: g.raveState });
+        };
+
         if (data.action === 'set_video') {
             g.raveState.videoUrl = data.videoUrl;
             g.raveState.videoType = data.videoType;
@@ -927,25 +947,25 @@ io.on('connection', (socket) => {
             g.raveState.isPlaying = false;
             g.raveState.updatedAt = Date.now();
             saveGroups();
-            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+            broadcastRaveState();
         } else if (data.action === 'play') {
             g.raveState.isPlaying = true;
             g.raveState.currentTime = data.currentTime;
             g.raveState.updatedAt = Date.now();
-            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+            broadcastRaveState();
         } else if (data.action === 'pause') {
             g.raveState.isPlaying = false;
             g.raveState.currentTime = data.currentTime;
             g.raveState.updatedAt = Date.now();
-            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+            broadcastRaveState();
         } else if (data.action === 'seek') {
             g.raveState.currentTime = data.currentTime;
             g.raveState.updatedAt = Date.now();
-            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+            broadcastRaveState();
         } else if (data.action === 'pass_host') {
             g.raveState.host = data.newHost;
             saveGroups();
-            io.emit('rave_state_updated', { groupId: data.groupId, state: g.raveState });
+            broadcastRaveState();
         } else if (data.action === 'sync_request') {
             if (onlineUsers[g.raveState.host]) {
                 io.to(onlineUsers[g.raveState.host]).emit('rave_sync_request', { groupId: data.groupId, requester: currentUsername });
@@ -959,21 +979,30 @@ io.on('connection', (socket) => {
 
     socket.on('view_channel_msg', async (data) => {
         if (!currentUsername) return;
-        const msg = await db.get('SELECT views FROM messages WHERE id = ? AND isChannelPost = 1', [data.id]);
+        const msg = await db.get('SELECT views, toUser FROM messages WHERE id = ? AND isChannelPost = 1', [data.id]);
         if (msg) {
             let views = JSON.parse(msg.views || '[]');
             if (!views.includes(currentUsername)) {
                 views.push(currentUsername);
                 await db.run('UPDATE messages SET views = ? WHERE id = ?', [JSON.stringify(views), data.id]);
-                io.emit('msg_views_update', { id: data.id, views: views.length });
+                if (groupsCache[msg.toUser]) {
+                    emitToGroup(msg.toUser, 'msg_views_update', { id: data.id, views: views.length });
+                }
             }
         }
     });
 
     socket.on('edit_msg', async (data) => {
         if (!currentUsername) return;
-        await db.run(`UPDATE messages SET text = ?, isEdited = 1 WHERE id = ? AND fromUser = ?`, [data.text, data.id, currentUsername]);
-        io.emit('msg_edited', { id: data.id, text: data.text });
+        const msg = await db.get(`SELECT toUser FROM messages WHERE id = ?`, [data.id]);
+        if (msg) {
+            await db.run(`UPDATE messages SET text = ?, isEdited = 1 WHERE id = ? AND fromUser = ?`, [data.text, data.id, currentUsername]);
+            if (groupsCache[msg.toUser]) {
+                emitToGroup(msg.toUser, 'msg_edited', { id: data.id, text: data.text });
+            } else {
+                emitToUsers([currentUsername, msg.toUser], 'msg_edited', { id: data.id, text: data.text });
+            }
+        }
     });
 
     socket.on('pin_msg', async (data) => {
@@ -989,13 +1018,20 @@ io.on('connection', (socket) => {
 
         await db.run(`UPDATE messages SET isPinned = 0 WHERE toUser = ?`, [data.chatId]);
         await db.run(`UPDATE messages SET isPinned = 1 WHERE id = ?`, [data.id]);
-        io.emit('msg_pinned', { id: data.id, text: data.text, chatId: data.chatId });
 
         const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.chatId, 'закрепил(а) сообщение', timeStr]);
-        io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.chatId, text: 'закрепил(а) сообщение', time: timeStr, isSystem: true, isChannelPost: false });
+        const sysMsg = { id: sysMsgId, from: currentUsername, to: data.chatId, text: 'закрепил(а) сообщение', time: timeStr, isSystem: true, isChannelPost: false };
+
+        if (groupsCache[data.chatId]) {
+            emitToGroup(data.chatId, 'msg_pinned', { id: data.id, text: data.text, chatId: data.chatId });
+            emitToGroup(data.chatId, 'msg_receive', sysMsg);
+        } else {
+            emitToUsers([currentUsername, data.chatId], 'msg_pinned', { id: data.id, text: data.text, chatId: data.chatId });
+            emitToUsers([currentUsername, data.chatId], 'msg_receive', sysMsg);
+        }
     });
 
     socket.on('mark_read', async (data) => {
@@ -1201,7 +1237,7 @@ io.on('connection', (socket) => {
             if (data.profileColor !== undefined) groupsCache[data.id].profileColor = data.profileColor;
             if (data.emojiStatus !== undefined) groupsCache[data.id].emojiStatus = data.emojiStatus;
             saveGroups();
-            io.emit('group_updated', { groupId: data.id });
+            emitToGroup(data.id, 'group_updated', { groupId: data.id });
         }
     });
 
@@ -1214,7 +1250,7 @@ io.on('connection', (socket) => {
             }
             g.admins[data.userId] = { title: data.title || 'Админ' };
             saveGroups();
-            io.emit('group_updated', { groupId: data.groupId });
+            emitToGroup(data.groupId, 'group_updated', { groupId: data.groupId });
         }
     });
 
@@ -1224,7 +1260,7 @@ io.on('connection', (socket) => {
         if (g && g.creator === currentUsername && g.admins) {
             delete g.admins[data.userId];
             saveGroups();
-            io.emit('group_updated', { groupId: data.groupId });
+            emitToGroup(data.groupId, 'group_updated', { groupId: data.groupId });
         }
     });
 
@@ -1238,7 +1274,7 @@ io.on('connection', (socket) => {
             }
             g.muted[data.userId] = Date.now() + (data.hours * 60 * 60 * 1000);
             saveGroups();
-            io.emit('group_updated', { groupId: data.groupId });
+            emitToGroup(data.groupId, 'group_updated', { groupId: data.groupId });
         }
     });
 
@@ -1278,11 +1314,11 @@ io.on('connection', (socket) => {
                 const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 
                 await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, targetGroup.id, 'присоединился(лась) к чату по ссылке', timeStr]);
-                io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: targetGroup.id, text: 'присоединился(лась) к чату по ссылке', time: timeStr, isSystem: true, isChannelPost: false });
+                emitToGroup(targetGroup.id, 'msg_receive', { id: sysMsgId, from: currentUsername, to: targetGroup.id, text: 'присоединился(лась) к чату по ссылке', time: timeStr, isSystem: true, isChannelPost: false });
                 
                 socket.emit('group_joined_success', { groupId: targetGroup.id });
                 socket.emit('get_my_chats');
-                io.emit('group_updated', { groupId: targetGroup.id });
+                emitToGroup(targetGroup.id, 'group_updated', { groupId: targetGroup.id });
             } else {
                 socket.emit('group_joined_success', { groupId: targetGroup.id }); 
             }
@@ -1349,7 +1385,8 @@ io.on('connection', (socket) => {
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.id, sysText, timeStr]);
-        io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.id, text: sysText, time: timeStr, isSystem: true, isChannelPost: false });
+        const sysMsg = { id: sysMsgId, from: currentUsername, to: data.id, text: sysText, time: timeStr, isSystem: true, isChannelPost: false };
+        emitToGroup(data.id, 'msg_receive', sysMsg);
 
         members.forEach(member => { 
             if (member !== currentUsername && onlineUsers[member]) {
@@ -1366,10 +1403,12 @@ io.on('connection', (socket) => {
             const sysMsgId = 'sys_' + Date.now() + Math.random().toString(36).substr(2, 5);
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.groupId, 'покинул(а) чат', timeStr]);
-            io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.groupId, text: 'покинул(а) чат', time: timeStr, isSystem: true, isChannelPost: false });
+            emitToGroup(data.groupId, 'msg_receive', { id: sysMsgId, from: currentUsername, to: data.groupId, text: 'покинул(а) чат', time: timeStr, isSystem: true, isChannelPost: false });
 
             if (groupsCache[data.groupId].members.length === 0) {
                 delete groupsCache[data.groupId];
+            } else {
+                emitToGroup(data.groupId, 'group_updated', { groupId: data.groupId });
             }
             saveGroups();
             socket.emit('get_my_chats');
@@ -1394,16 +1433,9 @@ io.on('connection', (socket) => {
             if ((data.forEveryone && msg.fromUser === currentUsername) || hasAdminRights) {
                 await db.run(`DELETE FROM messages WHERE id = ?`, [data.id]);
                 if (groupsCache[recipient]) { 
-                    groupsCache[recipient].members.forEach(member => { 
-                        if (onlineUsers[member]) {
-                            io.to(onlineUsers[member]).emit('msg_deleted', { id: data.id }); 
-                        }
-                    }); 
+                    emitToGroup(recipient, 'msg_deleted', { id: data.id });
                 } else { 
-                    socket.emit('msg_deleted', { id: data.id }); 
-                    if (onlineUsers[recipient]) {
-                        io.to(onlineUsers[recipient]).emit('msg_deleted', { id: data.id }); 
-                    }
+                    emitToUsers([currentUsername, recipient], 'msg_deleted', { id: data.id });
                 }
             } else {
                 let deletedFor = msg.deletedFor ? JSON.parse(msg.deletedFor) : [];
@@ -1430,11 +1462,13 @@ io.on('connection', (socket) => {
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             await db.run(`INSERT INTO messages (id, fromUser, toUser, text, time, isSystem, isChannelPost) VALUES (?, ?, ?, ?, ?, 1, 0)`, [sysMsgId, currentUsername, data.groupId, `исключил(а) пользователя @${data.userId}`, timeStr]);
-            io.emit('msg_receive', { id: sysMsgId, from: currentUsername, to: data.groupId, text: `исключил(а) пользователя @${data.userId}`, time: timeStr, isSystem: true, isChannelPost: false });
+            emitToGroup(data.groupId, 'msg_receive', { id: sysMsgId, from: currentUsername, to: data.groupId, text: `исключил(а) пользователя @${data.userId}`, time: timeStr, isSystem: true, isChannelPost: false });
 
-            io.emit('group_updated', { groupId: data.groupId });
+            emitToGroup(data.groupId, 'group_updated', { groupId: data.groupId });
+            
             if (onlineUsers[data.userId]) {
                 io.to(onlineUsers[data.userId]).emit('kicked_from_group', { groupId: data.groupId });
+                io.to(onlineUsers[data.userId]).emit('get_my_chats');
             }
         }
     });
