@@ -1484,6 +1484,10 @@ body {
     
     .input-container { padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 
+    /* RAVE Mobile Fixes */
+    .rave-video-wrapper { max-height: 30vh !important; }
+    .rave-host-controls { max-height: 50vh; overflow-y: auto; }
+
     /* ПАНЕЛЬ НАВИГАЦИИ TELEGRAM ANDROID STYLE (БАЗОВАЯ) */
     .mobile-bottom-nav {
         display: flex; position: fixed; bottom: 0; left: 0; width: 100%;
@@ -1533,12 +1537,12 @@ body {
         left: 5%;
         width: 90%;
         border-radius: 35px;
-        background: rgba(15, 15, 20, 0.85); /* Very dark glass matching image */
+        background: rgba(15, 15, 20, 0.85);
         backdrop-filter: blur(30px) saturate(200%);
         -webkit-backdrop-filter: blur(30px) saturate(200%);
         border: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        padding-bottom: 0; /* Remove safe-area padding for floating pill */
+        padding-bottom: 0; 
     }
 
     [data-glass="on"] .mobile-bottom-nav .nav-item {
@@ -1546,19 +1550,19 @@ body {
     }
 
     [data-glass="on"] .mobile-bottom-nav .nav-item.active {
-        color: #ffffff; /* Text becomes white for active tab */
+        color: #ffffff; 
     }
 
     /* АНИМИРОВАННЫЙ ПОЛЗУНОК-ФОН ЗА АКТИВНОЙ ИКОНКОЙ */
     [data-glass="on"] .mobile-bottom-nav .nav-item::before {
         content: '';
         position: absolute;
-        top: 8px; /* Position behind the icon */
+        top: 8px; 
         left: 50%;
         transform: translateX(-50%) scale(0.5);
         width: 50px;
         height: 30px;
-        background: var(--primary); /* Яркий фон для ползунка */
+        background: var(--primary); 
         border-radius: 15px;
         z-index: 1;
         opacity: 0;
@@ -1575,7 +1579,7 @@ body {
     }
 
     [data-glass="on"] .mobile-bottom-nav .nav-item.active i {
-        color: #ffffff; /* Icon becomes white over the primary pill */
+        color: #ffffff; 
         transform: translateY(0) scale(1);
     }
 }
@@ -1619,12 +1623,10 @@ body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 var(--glass-highlight);
 }
 
-/* Фикс: чтобы стекло не обрезало обои, прозрачный фон */
 [data-glass="on"] .chat-area { background: transparent; }
 [data-glass="on"] .messages-container { padding-bottom: 20px; }
 [data-glass="on"] .contacts-list { padding-bottom: 120px; }
 
-/* Для чата с обоями: шапка и футер становятся стеклянными, а сообщения прозрачными, чтобы видеть фон */
 .chat-area.has-wallpaper .chat-header {
     background: rgba(20, 25, 35, 0.6) !important;
     backdrop-filter: blur(25px) saturate(200%);
@@ -1733,6 +1735,12 @@ body {
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--glass-border);
+}
+
+/* Блокировка действий для зрителей, но оставляем оверлей кликабельным */
+.rave-container.is-viewer #rave-html-player,
+.rave-container.is-viewer #rave-iframe-container {
+    pointer-events: none;
 }
 
 /* =========================================
