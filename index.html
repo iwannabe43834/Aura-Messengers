@@ -18,7 +18,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <link rel="stylesheet" href="/style.css?v=16">
+    <link rel="stylesheet" href="/style.css?v=23">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script src="/socket.io/socket.io.js"></script>
@@ -100,7 +100,7 @@
             background: rgba(135, 116, 225, 0.3); 
         }
 
-        /* --- RAVE (КИНОЗАЛ) ПОИСК И СТИЛИ --- */
+        /* --- RAVE (КИНОЗАЛ) --- */
         .rave-container {
             width: 100%;
             background: #000;
@@ -109,6 +109,14 @@
             border-bottom: 1px solid var(--border);
             z-index: 11;
             flex-shrink: 0;
+        }
+
+        /* Полная блокировка действий для зрителей (перемотки, паузы и т.д.) */
+        .rave-container.is-viewer #rave-iframe-container {
+            pointer-events: none !important;
+        }
+        .rave-container.is-viewer #rave-html-player {
+            pointer-events: none !important;
         }
         
         .rave-video-wrapper {
@@ -137,8 +145,34 @@
         }
         
         .rave-host-controls {
-            padding: 15px;
             background: var(--bg-sidebar);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .rave-toggle-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+            transition: 0.2s;
+        }
+
+        .rave-toggle-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .rave-panel-content {
+            padding: 15px;
             display: flex;
             flex-direction: column;
             gap: 15px;
@@ -162,7 +196,7 @@
         
         .rave-select { cursor: pointer; }
         .rave-input { flex: 1; }
-        
+
         .rave-playback-controls {
             display: flex;
             justify-content: center;
@@ -204,14 +238,13 @@
         .rave-ctrl-btn.sync:hover { 
             background: rgba(135, 116, 225, 0.3); 
         }
-
-        /* Стиль сетки результатов поиска Rave */
+        
         .rave-search-results {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 15px;
             margin-top: 15px;
-            max-height: 350px;
+            max-height: 250px;
             overflow-y: auto;
             padding-right: 5px;
         }
@@ -270,17 +303,17 @@
         }
 
         .rave-search-title {
-    font-size: 0.9rem;
-    color: white;
-    font-weight: bold;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2; /* <--- ДОБАВЬ ЭТУ СТРОЧКУ */
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    margin-bottom: 5px;
-    line-height: 1.3;
-}
+            font-size: 0.9rem;
+            color: white;
+            font-weight: bold;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2; 
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 5px;
+            line-height: 1.3;
+        }
 
         .rave-search-author {
             font-size: 0.8rem;
@@ -931,33 +964,44 @@
 
             <div id="rave-container" class="rave-container hidden">
                 <div class="rave-video-wrapper" id="rave-video-wrapper">
+                    <div id="rave-viewer-overlay" class="hidden" onclick="joinRaveSync()" style="position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:20; display:flex; align-items:center; justify-content:center; flex-direction:column; cursor:pointer; backdrop-filter: blur(5px); pointer-events: auto !important;">
+                        <i class="fas fa-play-circle" style="font-size: 4rem; color: var(--primary); margin-bottom: 15px; border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.5);"></i>
+                        <span style="color: white; font-weight: bold; font-size: 1.1rem;">Синхронизировать плеер</span>
+                        <span style="color: var(--text-dim); font-size: 0.8rem; margin-top: 5px;">(Нажмите для включения звука и видео)</span>
+                    </div>
+
                     <div id="rave-placeholder" class="rave-placeholder">
                         <i class="fas fa-film"></i>
                         <p>Кинозал готов. Ждем видео от хоста...</p>
                     </div>
-                    <video id="rave-html-player" class="hidden" style="width:100%; height:100%;" controls playsinline></video>
+                    <video id="rave-html-player" class="hidden" style="width:100%; height:100%;"></video>
                     <div id="rave-iframe-container" class="hidden" style="width:100%; height:100%;"></div>
                 </div>
                 
                 <div id="rave-host-controls" class="rave-host-controls hidden">
-                    <span id="rave-host-status" style="color: #4ade80; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px;">
+                    <span id="rave-host-status" style="color: #4ade80; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; display:block; padding: 15px 15px 0 15px;">
                         <i class="fas fa-crown"></i> Вы управляете видео (Хост)
                     </span>
-                    <div class="rave-input-group">
-                        <select id="rave-source-type" class="rave-select">
-                            <option value="youtube">YouTube</option>
-                            <option value="vk">VK Видео</option>
-                            <option value="rutube">RuTube</option>
-                            <option value="direct">Прямая ссылка (.mp4)</option>
-                        </select>
-                        <input type="text" id="rave-url-input" placeholder="Поиск видео или ссылка..." class="rave-input" onkeypress="if(event.key === 'Enter') searchRaveVideo()">
-                        <button onclick="searchRaveVideo()" class="primary-btn-small" style="margin: 0; width: auto; border-radius: 12px; padding: 0 20px;">
-                            <i class="fas fa-search"></i>
-                        </button>
+                    <button onclick="toggleRavePanel()" class="rave-toggle-btn">
+                         <i class="fas fa-search"></i> Поиск видео <i class="fas fa-chevron-down" id="rave-toggle-icon"></i>
+                    </button>
+                    <div id="rave-panel-content" class="rave-panel-content hidden">
+                        <div class="rave-input-group">
+                            <select id="rave-source-type" class="rave-select">
+                                <option value="youtube">YouTube</option>
+                                <option value="vk">VK Видео</option>
+                                <option value="rutube">RuTube</option>
+                                <option value="direct">Прямая ссылка (.mp4)</option>
+                            </select>
+                            <input type="text" id="rave-url-input" placeholder="Поиск видео или ссылка..." class="rave-input" onkeypress="if(event.key === 'Enter') searchRaveVideo()">
+                            <button onclick="searchRaveVideo()" class="primary-btn-small" style="margin: 0; width: auto; border-radius: 12px; padding: 0 20px;">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+
+                        <div id="rave-search-results" class="rave-search-results hidden"></div>
                     </div>
-
-                    <div id="rave-search-results" class="rave-search-results hidden"></div>
-
+                    
                     <div class="rave-playback-controls">
                         <button onclick="raveHostAction('play')" class="rave-ctrl-btn">
                             <i class="fas fa-play"></i>
@@ -1363,8 +1407,31 @@
         }
     }
 
-    /* === ЛОГИКА RAVE (КИНОЗАЛА) - ПОИСК И ВОСПРОИЗВЕДЕНИЕ === */
+    /* === ЛОГИКА ПОИСКА ВИДЕО ДЛЯ RAVE === */
     let currentRaveState = null;
+    let viewerHasInteracted = false;
+    let localPlayerTime = 0; // Точное локальное время хоста
+
+    function joinRaveSync() {
+        viewerHasInteracted = true;
+        document.getElementById('rave-viewer-overlay').classList.add('hidden');
+        if (currentRaveState) {
+            const vidIframe = document.getElementById('rave-iframe-container');
+            vidIframe.innerHTML = ''; // Очищаем, чтобы зафорсить пересоздание
+            applyRaveState(currentRaveState);
+        }
+    }
+
+    function toggleRavePanel() {
+        const panel = document.getElementById('rave-panel-content');
+        const icon = document.getElementById('rave-toggle-icon');
+        panel.classList.toggle('hidden');
+        if (panel.classList.contains('hidden')) {
+            icon.className = 'fas fa-chevron-down';
+        } else {
+            icon.className = 'fas fa-chevron-up';
+        }
+    }
     
     function searchRaveVideo() {
         const query = document.getElementById('rave-url-input').value.trim();
@@ -1372,13 +1439,11 @@
         
         if (!query) return;
 
-        // Если это прямая ссылка (начинается с http), то просто включаем её, а не ищем
         if (query.startsWith('http')) {
             setRaveVideoDirect(query, platform);
             return;
         }
 
-        // Иначе отправляем запрос на поиск на сервер
         const resultsContainer = document.getElementById('rave-search-results');
         resultsContainer.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-dim);"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Ищем видео...</p></div>';
         resultsContainer.classList.remove('hidden');
@@ -1386,7 +1451,6 @@
         socket.emit('rave_search_video', { platform: platform, query: query });
     }
 
-    // Слушаем результаты поиска от сервера
     socket.on('rave_search_results', (data) => {
         const container = document.getElementById('rave-search-results');
         container.innerHTML = '';
@@ -1398,12 +1462,11 @@
 
         let html = '';
         data.results.forEach(v => {
-            // Формируем embed URL в зависимости от платформы
             let embedUrl = '';
             if (data.platform === 'youtube') {
                 embedUrl = `https://www.youtube.com/embed/${v.id}?autoplay=1&enablejsapi=1`;
             } else {
-                embedUrl = v.url; // Для других платформ берем как есть
+                embedUrl = v.url;
             }
             
             html += `
@@ -1422,7 +1485,6 @@
         container.innerHTML = html;
     });
 
-    // Функция для прямого запуска видео (когда кликнули на карточку поиска или вставили прямую ссылку)
     function setRaveVideoDirect(url, typeSelect) {
         let videoType = 'direct';
         let finalUrl = url;
@@ -1463,12 +1525,27 @@
             }
         }
         
-        // Отправляем сигнал на запуск
         socket.emit('rave_update_state', { action: 'set_video', groupId: selectedChatId, videoUrl: finalUrl, videoType: videoType });
         
-        // Очищаем и скрываем поиск
         document.getElementById('rave-url-input').value = '';
         document.getElementById('rave-search-results').classList.add('hidden');
+        const panel = document.getElementById('rave-panel-content');
+        if(panel) {
+            panel.classList.add('hidden');
+            document.getElementById('rave-toggle-icon').className = 'fas fa-chevron-down';
+        }
+    }
+
+    function raveHostAction(action) {
+        if (!currentRaveState || currentRaveState.host !== currentUser.username) return;
+        
+        if (action === 'sync') {
+            socket.emit('rave_update_state', { action: 'seek', groupId: selectedChatId, currentTime: localPlayerTime });
+            showToast("Синхронизация выполнена!");
+            return;
+        }
+        
+        socket.emit('rave_update_state', { action: action, groupId: selectedChatId, currentTime: localPlayerTime });
     }
 
     function applyRaveState(state) {
@@ -1478,13 +1555,26 @@
         const vidHtml = document.getElementById('rave-html-player');
         const vidIframe = document.getElementById('rave-iframe-container');
         const placeholder = document.getElementById('rave-placeholder');
+        const raveContainer = document.getElementById('rave-container');
+        const viewerOverlay = document.getElementById('rave-viewer-overlay');
         
         if (state.host === currentUser.username) {
             document.getElementById('rave-host-controls').classList.remove('hidden');
-            document.getElementById('rave-host-status').innerHTML = '<i class="fas fa-crown"></i> Вы управляете видео (Хост)';
+            raveContainer.classList.remove('is-viewer');
+            if(viewerOverlay) viewerOverlay.classList.add('hidden');
+            vidIframe.style.pointerEvents = 'auto';
         } else {
             document.getElementById('rave-host-controls').classList.add('hidden');
-            document.getElementById('rave-search-results').classList.add('hidden'); // Зрителям поиск не нужен
+            document.getElementById('rave-search-results').classList.add('hidden');
+            raveContainer.classList.add('is-viewer');
+            vidIframe.style.pointerEvents = 'none'; // СТРОГО БЛОКИРУЕМ НАЖАТИЯ ДЛЯ ЗРИТЕЛЕЙ
+            
+            if (!viewerHasInteracted && state.videoUrl) {
+                if(viewerOverlay) viewerOverlay.classList.remove('hidden');
+                return;
+            } else {
+                if(viewerOverlay) viewerOverlay.classList.add('hidden');
+            }
         }
 
         if (!state.videoUrl) {
@@ -1500,8 +1590,19 @@
             vidIframe.classList.add('hidden');
             vidHtml.classList.remove('hidden');
             
+            if (state.host === currentUser.username) {
+                vidHtml.setAttribute('controls', 'controls');
+                vidHtml.style.pointerEvents = 'auto';
+            } else {
+                vidHtml.removeAttribute('controls');
+                vidHtml.style.pointerEvents = 'none';
+            }
+            
             if (vidHtml.src !== state.videoUrl) {
                 vidHtml.src = state.videoUrl;
+            }
+            
+            if (Math.abs(vidHtml.currentTime - state.currentTime) > 1.5) {
                 vidHtml.currentTime = state.currentTime;
             }
             
@@ -1514,20 +1615,55 @@
             vidHtml.classList.add('hidden');
             vidIframe.classList.remove('hidden');
             
-            if (vidIframe.innerHTML.indexOf(state.videoUrl) === -1) {
-                vidIframe.innerHTML = `<iframe src="${state.videoUrl}" frameborder="0" allow="autoplay; fullscreen" style="width:100%; height:100%; border:none;"></iframe>`;
+            let finalIframeUrl = state.videoUrl;
+            
+            if (state.videoType === 'vk' && !finalIframeUrl.includes('js_api=1')) {
+                finalIframeUrl += finalIframeUrl.includes('?') ? '&js_api=1' : '?js_api=1';
             }
-        }
-    }
-    
-    function raveHostAction(action) {
-        const vid = document.getElementById('rave-html-player');
-        if (action === 'play') {
-            socket.emit('rave_update_state', { action: 'play', groupId: selectedChatId, currentTime: vid.currentTime });
-        } else if (action === 'pause') {
-            socket.emit('rave_update_state', { action: 'pause', groupId: selectedChatId, currentTime: vid.currentTime });
-        } else if (action === 'sync') {
-            socket.emit('rave_update_state', { action: 'seek', groupId: selectedChatId, currentTime: vid.currentTime });
+            if (state.videoType === 'youtube' && !finalIframeUrl.includes('enablejsapi=1')) {
+                finalIframeUrl += finalIframeUrl.includes('?') ? '&enablejsapi=1' : '?enablejsapi=1';
+            }
+
+            let iframe = vidIframe.querySelector('iframe');
+            
+            if (!iframe || iframe.getAttribute('data-raw-src') !== state.videoUrl) {
+                let startUrl = finalIframeUrl;
+                
+                if (state.videoType === 'vk') {
+                    startUrl += '&autoplay=1';
+                    if (state.currentTime > 0) startUrl += '&t=' + Math.floor(state.currentTime);
+                } else if (state.videoType === 'rutube') {
+                    startUrl += '&autoPlay=1';
+                    if (state.currentTime > 0) startUrl += '&t=' + Math.floor(state.currentTime);
+                } else if (state.videoType === 'youtube') {
+                    startUrl += '&autoplay=1';
+                    if (state.currentTime > 0) startUrl += '&start=' + Math.floor(state.currentTime);
+                }
+
+                vidIframe.innerHTML = `<iframe data-raw-src="${state.videoUrl}" src="${startUrl}" frameborder="0" allow="autoplay; fullscreen" style="width:100%; height:100%; border:none;"></iframe>`;
+            } else {
+                if (iframe.contentWindow && (state.host === currentUser.username || viewerHasInteracted)) {
+                    
+                    let timeDiff = Math.abs(localPlayerTime - state.currentTime);
+                    let needsSeek = timeDiff > 3; // Форсируем перемотку только если рассинхрон больше 3 секунд
+
+                    try {
+                        if (state.videoType === 'youtube') {
+                            if (needsSeek) iframe.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'seekTo', args: [state.currentTime, true]}), '*');
+                            const func = state.isPlaying ? 'playVideo' : 'pauseVideo';
+                            iframe.contentWindow.postMessage(JSON.stringify({event: 'command', func: func, args: []}), '*');
+                        } else if (state.videoType === 'vk') {
+                            if (needsSeek) iframe.contentWindow.postMessage(JSON.stringify({method: 'seek', args: [state.currentTime]}), '*');
+                            const cmd = state.isPlaying ? 'play' : 'pause';
+                            iframe.contentWindow.postMessage(JSON.stringify({method: cmd}), '*');
+                        } else if (state.videoType === 'rutube') {
+                            if (needsSeek) iframe.contentWindow.postMessage(JSON.stringify({type: 'player:setCurrentTime', data: {time: state.currentTime}}), '*');
+                            const type = state.isPlaying ? 'player:play' : 'player:pause';
+                            iframe.contentWindow.postMessage(JSON.stringify({type: type, data: {}}), '*');
+                        }
+                    } catch(e) { console.error("Ошибка отправки команды в плеер:", e); }
+                }
+            }
         }
     }
 
@@ -1537,32 +1673,82 @@
         }
     });
 
-    socket.on('rave_sync_request', (data) => {
-        if (selectedChatId === data.groupId && currentRaveState && currentRaveState.host === currentUser.username) {
-            const vid = document.getElementById('rave-html-player');
-            socket.emit('rave_update_state', { 
-                action: 'sync_response', 
-                groupId: data.groupId, 
-                requester: data.requester, 
-                currentTime: vid.currentTime, 
-                isPlaying: !vid.paused 
-            });
+    const nativePlayer = document.getElementById('rave-html-player');
+    nativePlayer.addEventListener('timeupdate', () => {
+        localPlayerTime = nativePlayer.currentTime;
+    });
+    nativePlayer.addEventListener('play', () => {
+        if (currentRaveState && currentRaveState.host === currentUser.username) {
+            socket.emit('rave_update_state', { action: 'play', groupId: selectedChatId, currentTime: nativePlayer.currentTime });
+        }
+    });
+    nativePlayer.addEventListener('pause', () => {
+        if (currentRaveState && currentRaveState.host === currentUser.username) {
+            socket.emit('rave_update_state', { action: 'pause', groupId: selectedChatId, currentTime: nativePlayer.currentTime });
+        }
+    });
+    nativePlayer.addEventListener('seeked', () => {
+        if (currentRaveState && currentRaveState.host === currentUser.username) {
+            socket.emit('rave_update_state', { action: 'seek', groupId: selectedChatId, currentTime: nativePlayer.currentTime });
         }
     });
 
-    socket.on('rave_sync_response', (data) => {
-        if (selectedChatId === data.groupId) {
-            const vid = document.getElementById('rave-html-player');
-            if (Math.abs(vid.currentTime - data.currentTime) > 1.5) {
-                vid.currentTime = data.currentTime;
+    window.addEventListener('message', function(e) {
+        try {
+            if (typeof e.data === 'string') {
+                const data = JSON.parse(e.data);
+                if (data.event === 'infoDelivery' && data.info && data.info.currentTime !== undefined) {
+                    localPlayerTime = data.info.currentTime;
+                }
+                if (data.event === 'timeUpdate') {
+                    localPlayerTime = data.time;
+                }
+            } else if (e.data && e.data.type === 'player:currentTime' && e.data.data) {
+                localPlayerTime = e.data.data.time;
+            } else if (e.data && e.data.event === 'timeUpdate') {
+                localPlayerTime = e.data.time;
             }
-            if (data.isPlaying && vid.paused) {
-                vid.play().catch(()=>{});
-            } else if (!data.isPlaying && !vid.paused) {
-                vid.pause();
+        } catch(err) {}
+
+        if (!currentRaveState || currentRaveState.host !== currentUser.username) return;
+        
+        let action = null;
+        let time = null;
+
+        try {
+            if (typeof e.data === 'string') {
+                const data = JSON.parse(e.data);
+                if (data.event === 'onPlay') action = 'play';
+                if (data.event === 'onPause') action = 'pause';
+            }
+
+            if (e.data && e.data.type) {
+                if (e.data.type === 'player:changeState') {
+                    if (e.data.data.state === 'playing') action = 'play';
+                    if (e.data.data.state === 'paused') action = 'pause';
+                }
+            }
+
+            if (action) {
+                if (currentRaveState.isPlaying && action === 'play') return;
+                if (!currentRaveState.isPlaying && action === 'pause') return;
+                
+                socket.emit('rave_update_state', { action: action, groupId: selectedChatId, currentTime: localPlayerTime });
+            }
+        } catch(err) {}
+    });
+
+    setInterval(() => {
+        if (selectedChatId && currentRaveState && currentRaveState.host === currentUser.username) {
+            if (currentRaveState.videoType === 'direct') {
+                const vid = document.getElementById('rave-html-player');
+                if (!vid.classList.contains('hidden') && !vid.paused) {
+                    socket.emit('rave_update_state', { action: 'play', groupId: selectedChatId, currentTime: vid.currentTime });
+                }
             }
         }
-    });
+    }, 5000);
+
 
     // --- ИСТОРИИ (STORIES) ---
     let storiesData = [];
@@ -2050,6 +2236,7 @@
         updateUnreadBadge(chatId); 
         currentOffset = 0; 
         hasMoreHistory = true; 
+        viewerHasInteracted = false; 
         
         document.getElementById('pinned-banner').classList.add('hidden'); 
         messagesDiv.innerHTML = ''; 
@@ -2561,7 +2748,7 @@
     
     function resetRecordingUI() { 
         msgInput.classList.remove('hidden'); 
-        attachBtn.classList.remove('hidden'); 
+        attachBtn.remove('hidden'); 
         recordUI.classList.add('hidden'); 
         micBtn.classList.remove('recording-active'); 
         micBtn.style.transform = 'translateX(0px)'; 
@@ -3879,203 +4066,6 @@
             updateAudioProgress(audioId); 
         } 
     }
-
-    // === ЛОГИКА RAVE (КИНОЗАЛА) ИЗ КЛИЕНТА ===
-    let raveSyncInterval = null;
-    
-    function searchRaveVideo() {
-        const query = document.getElementById('rave-url-input').value.trim();
-        const platform = document.getElementById('rave-source-type').value;
-        
-        if (!query) return;
-
-        // Если это прямая ссылка (начинается с http), то просто включаем её
-        if (query.startsWith('http')) {
-            setRaveVideoDirect(query, platform);
-            return;
-        }
-
-        // Иначе отправляем запрос на поиск
-        const resultsContainer = document.getElementById('rave-search-results');
-        resultsContainer.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-dim);"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Ищем видео...</p></div>';
-        resultsContainer.classList.remove('hidden');
-        
-        socket.emit('rave_search_video', { platform: platform, query: query });
-    }
-
-    // Слушаем результаты поиска от сервера
-    socket.on('rave_search_results', (data) => {
-        const container = document.getElementById('rave-search-results');
-        container.innerHTML = '';
-        
-        if (!data.results || data.results.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-dim);"><i class="fas fa-search-minus fa-2x"></i><p style="margin-top:10px;">Ничего не найдено</p></div>';
-            return;
-        }
-
-        let html = '';
-        data.results.forEach(v => {
-            let embedUrl = '';
-            if (data.platform === 'youtube') {
-                embedUrl = `https://www.youtube.com/embed/${v.id}?autoplay=1&enablejsapi=1`;
-            } else {
-                embedUrl = v.url;
-            }
-            
-            html += `
-                <div class="rave-search-card" onclick="setRaveVideoDirect('${embedUrl}', '${data.platform}')">
-                    <div class="rave-search-thumb">
-                        <img src="${v.thumbnail}" alt="Thumbnail">
-                        <span class="rave-search-duration">${v.duration}</span>
-                    </div>
-                    <div class="rave-search-info">
-                        <div class="rave-search-title">${v.title}</div>
-                        <div class="rave-search-author">${v.author}</div>
-                    </div>
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-    });
-
-    function setRaveVideoDirect(url, typeSelect) {
-        let videoType = 'direct';
-        let finalUrl = url;
-        
-        if (typeSelect === 'youtube') {
-            videoType = 'youtube';
-            if (url.includes('<iframe') && url.includes('src="')) {
-                const match = url.match(/src="([^"]+)"/);
-                if (match && match[1]) finalUrl = match[1];
-            } else {
-                try {
-                    const videoId = url.includes('youtu.be/') ? url.split('youtu.be/')[1].split('?')[0] : new URLSearchParams(new URL(url).search).get('v');
-                    if (videoId) finalUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
-                } catch(e) {}
-            }
-        } else if (typeSelect === 'vk') {
-            videoType = 'vk';
-            if (url.includes('<iframe') && url.includes('src="')) {
-                const match = url.match(/src="([^"]+)"/);
-                if (match && match[1]) finalUrl = match[1];
-            } else if (!url.includes('video_ext.php')) {
-                showToast('Для ВК нужна ссылка для встраивания (Экспорт -> код iframe)');
-                return;
-            }
-        } else if (typeSelect === 'rutube') {
-            videoType = 'rutube';
-            if (url.includes('<iframe') && url.includes('src="')) {
-                const match = url.match(/src="([^"]+)"/);
-                if (match && match[1]) finalUrl = match[1];
-            } else if (url.includes('rutube.ru/video/')) {
-                const match = url.match(/rutube\.ru\/video\/([a-zA-Z0-9]+)/);
-                if (match && match[1]) {
-                    finalUrl = `https://rutube.ru/play/embed/${match[1]}`;
-                }
-            } else if (!url.includes('/play/embed/')) {
-                showToast('Вставьте обычную ссылку на видео RuTube');
-                return;
-            }
-        }
-        
-        socket.emit('rave_update_state', { action: 'set_video', groupId: selectedChatId, videoUrl: finalUrl, videoType: videoType });
-        
-        document.getElementById('rave-url-input').value = '';
-        document.getElementById('rave-search-results').classList.add('hidden');
-    }
-
-    function applyRaveState(state) {
-        if (!state) return;
-        currentRaveState = state;
-        
-        const vidHtml = document.getElementById('rave-html-player');
-        const vidIframe = document.getElementById('rave-iframe-container');
-        const placeholder = document.getElementById('rave-placeholder');
-        
-        if (state.host === currentUser.username) {
-            document.getElementById('rave-host-controls').classList.remove('hidden');
-            document.getElementById('rave-host-status').innerHTML = '<i class="fas fa-crown"></i> Вы управляете видео (Хост)';
-        } else {
-            document.getElementById('rave-host-controls').classList.add('hidden');
-            document.getElementById('rave-search-results').classList.add('hidden');
-        }
-
-        if (!state.videoUrl) {
-            vidHtml.classList.add('hidden');
-            vidIframe.classList.add('hidden');
-            placeholder.classList.remove('hidden');
-            return;
-        }
-
-        placeholder.classList.add('hidden');
-
-        if (state.videoType === 'direct' || state.videoUrl.endsWith('.mp4')) {
-            vidIframe.classList.add('hidden');
-            vidHtml.classList.remove('hidden');
-            
-            if (vidHtml.src !== state.videoUrl) {
-                vidHtml.src = state.videoUrl;
-                vidHtml.currentTime = state.currentTime;
-            }
-            
-            if (state.isPlaying && vidHtml.paused) {
-                vidHtml.play().catch(()=>{});
-            } else if (!state.isPlaying && !vidHtml.paused) {
-                vidHtml.pause();
-            }
-        } else {
-            vidHtml.classList.add('hidden');
-            vidIframe.classList.remove('hidden');
-            
-            if (vidIframe.innerHTML.indexOf(state.videoUrl) === -1) {
-                vidIframe.innerHTML = `<iframe src="${state.videoUrl}" frameborder="0" allow="autoplay; fullscreen" style="width:100%; height:100%; border:none;"></iframe>`;
-            }
-        }
-    }
-    
-    function raveHostAction(action) {
-        const vid = document.getElementById('rave-html-player');
-        if (action === 'play') {
-            socket.emit('rave_update_state', { action: 'play', groupId: selectedChatId, currentTime: vid.currentTime });
-        } else if (action === 'pause') {
-            socket.emit('rave_update_state', { action: 'pause', groupId: selectedChatId, currentTime: vid.currentTime });
-        } else if (action === 'sync') {
-            socket.emit('rave_update_state', { action: 'seek', groupId: selectedChatId, currentTime: vid.currentTime });
-        }
-    }
-
-    socket.on('rave_state_updated', (data) => {
-        if (selectedChatId === data.groupId) {
-            applyRaveState(data.state);
-        }
-    });
-
-    socket.on('rave_sync_request', (data) => {
-        if (selectedChatId === data.groupId && currentRaveState && currentRaveState.host === currentUser.username) {
-            const vid = document.getElementById('rave-html-player');
-            socket.emit('rave_update_state', { 
-                action: 'sync_response', 
-                groupId: data.groupId, 
-                requester: data.requester, 
-                currentTime: vid.currentTime, 
-                isPlaying: !vid.paused 
-            });
-        }
-    });
-
-    socket.on('rave_sync_response', (data) => {
-        if (selectedChatId === data.groupId) {
-            const vid = document.getElementById('rave-html-player');
-            if (Math.abs(vid.currentTime - data.currentTime) > 1.5) {
-                vid.currentTime = data.currentTime;
-            }
-            if (data.isPlaying && vid.paused) {
-                vid.play().catch(()=>{});
-            } else if (!data.isPlaying && !vid.paused) {
-                vid.pause();
-            }
-        }
-    });
 
     sendBtn.onclick = send; 
     
