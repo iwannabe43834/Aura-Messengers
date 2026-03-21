@@ -74,7 +74,7 @@ const verificationCodes = {};
 
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
@@ -633,6 +633,44 @@ io.on('connection', (socket) => {
         socket.emit('call_history_data', rows);
     });
 
+    // ===== НОВЫЙ ГЛОБАЛЬНЫЙ ПОИСК (ИСПРАВЛЕННЫЙ) =====
+    socket.on('search_users_v2', (data) => {
+        if (!currentUsername) return;
+        const query = (data.query || '').toLowerCase().trim();
+        let exactMatches = [];
+        
+        if (query) {
+            // Поиск по пользователям (публичный)
+            for (const uname in usersCache) {
+                if (uname === currentUsername) continue;
+                const u = usersCache[uname];
+                if (uname.toLowerCase().includes(query) || (u.name && u.name.toLowerCase().includes(query))) {
+                    exactMatches.push({ type: 'user', username: uname, name: u.name, avatar: u.avatar, profileColor: u.profileColor });
+                }
+            }
+            // Поиск по группам и комнатам (ТОЛЬКО СВОИ)
+            for (const gid in groupsCache) {
+                const g = groupsCache[gid];
+                // ПРОВЕРКА: показываем только те комнаты/группы, где пользователь является участником!
+                if (g.members && g.members.includes(currentUsername)) {
+                    if (gid.toLowerCase().includes(query) || (g.name && g.name.toLowerCase().includes(query))) {
+                        exactMatches.push({ type: g.type, username: gid, name: g.name, avatar: g.avatar, profileColor: g.profileColor });
+                    }
+                }
+            }
+        }
+        
+        // Рандомные рекомендации (до 5 человек, исключая самого себя)
+        const allU = Object.keys(usersCache).filter(u => u !== currentUsername);
+        const shuffled = allU.sort(() => 0.5 - Math.random());
+        const recommendations = shuffled.slice(0, 5).map(uname => {
+            const u = usersCache[uname];
+            return { type: 'user', username: uname, name: u.name, avatar: u.avatar, profileColor: u.profileColor };
+        });
+
+        socket.emit('search_results_v2', { query, exactMatches, recommendations });
+    });
+
     socket.on('get_history', async (data) => {
         if (!currentUsername) return;
         const chatWith = data.chatWith;
@@ -1074,6 +1112,21 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ===== 4. УНИВЕРСАЛЬНЫЕ ИНДИКАТОРЫ ДЕЙСТВИЙ (Печатает, Записывает, Отправляет) =====
+    socket.on('chat_action', (data) => {
+        if (!currentUsername) return;
+        const target = data.to;
+        if (groupsCache[target] && groupsCache[target].type !== 'channel') {
+            groupsCache[target].members.forEach(member => {
+                if (member !== currentUsername && onlineUsers[member]) {
+                    io.to(onlineUsers[member]).emit('user_chat_action', { from: currentUsername, to: target, action: data.action });
+                }
+            });
+        } else if (onlineUsers[target] && !groupsCache[target]) {
+            io.to(onlineUsers[target]).emit('user_chat_action', { from: currentUsername, to: currentUsername, action: data.action });
+        }
+    });
+    
     socket.on('upload_story', async (data) => {
         if (!currentUsername) return;
         const id = Date.now().toString();
@@ -1513,7 +1566,8 @@ const peerServer = ExpressPeerServer(server, {
 app.use('/peerjs', peerServer);
 
 app.get('/join/:hash', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    // ДОБАВИЛИ 'public'
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.get('/:id', (req, res, next) => {
@@ -1525,7 +1579,8 @@ app.get('/:id', (req, res, next) => {
         return next();
     }
     
-    res.sendFile(path.join(__dirname, 'index.html'));
+    // ДОБАВИЛИ 'public'
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 server.listen(PORT, '0.0.0.0', () => { 
