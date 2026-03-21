@@ -824,17 +824,44 @@ function updateAudioProgress(audioId) { const audio = document.getElementById(au
 function setAudioDuration(audioId) { const audio = document.getElementById(audioId); const timeEl = document.getElementById('time-' + audioId); if (audio && audio.duration && audio.duration !== Infinity) { if (timeEl) timeEl.textContent = `${Math.floor(audio.duration / 60)}:${Math.floor(audio.duration % 60).toString().padStart(2, '0')}`; } }
 function resetAudio(audioId) { const icon = document.getElementById('icon-' + audioId); const progress = document.getElementById('progress-' + audioId); if (icon) icon.className = 'fas fa-play'; if (progress) progress.style.width = '0%'; setAudioDuration(audioId); if (currentPlayingAudio && currentPlayingAudio.id === audioId) currentPlayingAudio = null; }
 function seekCustomAudio(e, audioId) { const audio = document.getElementById(audioId); if (!audio) return; const rect = e.currentTarget.getBoundingClientRect(); if (audio.duration && audio.duration !== Infinity) { audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration; updateAudioProgress(audioId); } }
-function sendMediaFile(input) { 
-    const file = input.files[0]; if (!file) return; 
-    if (selectedChatId && selectedChatId !== 'me') socket.emit('chat_action', { to: selectedChatId, action: 'uploading' });
-    const reader = new FileReader(); 
-    reader.onload = (e) => { 
-        socket.emit('private_msg', { to: selectedChatId, text: '', media: { type: file.type.split('/')[0], data: e.target.result, name: file.name }, reply: replyData }); 
-        cancelReply(); 
-        if (selectedChatId && selectedChatId !== 'me') socket.emit('chat_action', { to: selectedChatId, action: 'clear' });
-    }; 
-    reader.readAsDataURL(file); 
-    input.value = ''; 
+async function sendMediaFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Показываем индикатор "отправка..."
+    if (selectedChatId) socket.emit('chat_action', { to: selectedChatId, action: 'uploading' });
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        // Загружаем файл на сервер через API
+        const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.url) {
+            // Отправляем в сокет только ССЫЛКУ на файл
+            socket.emit('private_msg', { 
+                to: selectedChatId, 
+                text: '', 
+                media: { 
+                    type: file.type.split('/')[0], 
+                    data: data.url, // Здесь теперь просто "/uploads/123.jpg"
+                    name: file.name 
+                }, 
+                reply: replyData 
+            });
+            cancelReply();
+        }
+    } catch (err) {
+        showToast("Ошибка при загрузке файла");
+    } finally {
+        if (selectedChatId) socket.emit('chat_action', { to: selectedChatId, action: 'clear' });
+        input.value = '';
+    }
 }
 
 function startReply(username, text, msgId, media) {
