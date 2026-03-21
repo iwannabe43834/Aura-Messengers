@@ -17,7 +17,7 @@ const io = new Server(server, {
     maxHttpBufferSize: 5e7 
 });
 
-const tgToken = '8666406149:AAHJA4-jhQTk2GDfvwfJdtWJejGfpwHvUEs';
+const tgToken = '8795912699:AAGNG756DWk2wDZA8fmsRlJSzGjxHvzlK0g';
 const tgBot = new TelegramBot(tgToken, { 
     polling: true 
 });
