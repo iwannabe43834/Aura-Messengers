@@ -1,0 +1,172 @@
+/* =========================================
+   EFFECTS, ANIMATIONS & LIQUID GLASS (iOS / Telegram Style)
+   ========================================= */
+
+/* ===== 1. ФОНОВЫЕ СФЕРЫ (ЖИДКИЙ ФОН) ===== */
+.liquid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: 0; pointer-events: none; transition: opacity 0.8s ease; }
+.blob { position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.65; animation: floatBlob 25s infinite alternate cubic-bezier(0.4, 0, 0.2, 1); mix-blend-mode: screen; }
+.blob-1 { width: 55vw; height: 55vw; background: var(--primary); top: -15%; left: -10%; }
+.blob-2 { width: 50vw; height: 50vw; background: var(--primary-hover); bottom: -15%; right: -10%; animation-delay: -5s; animation-duration: 28s; }
+.blob-3 { width: 60vw; height: 60vw; background: var(--text-dim); top: 20%; left: 30%; animation-delay: -12s; animation-duration: 22s; mix-blend-mode: overlay; }
+
+[data-theme="light"] .blob { mix-blend-mode: multiply; opacity: 0.8; }
+
+@keyframes floatBlob {
+    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    33% { transform: translate(15%, 25%) scale(1.1) rotate(90deg); }
+    66% { transform: translate(-10%, 15%) scale(0.95) rotate(180deg); }
+    100% { transform: translate(-25%, -15%) scale(1.05) rotate(360deg); }
+}
+
+/* ===== 2. ГЛОБАЛЬНЫЕ ПРУЖИННЫЕ АНИМАЦИИ (iOS STYLE) ===== */
+:root {
+    --ios-spring: cubic-bezier(0.28, 0.84, 0.42, 1);
+    --ios-bouncy: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes iosPopIn {
+    0% { opacity: 0; transform: scale(0.85) translateY(15px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes iosSlideInUp {
+    0% { opacity: 0; transform: translateY(25px) scale(0.98); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes iosFadeInBlur {
+    0% { opacity: 0; backdrop-filter: blur(0px); background: rgba(0,0,0,0); }
+    100% { opacity: 1; backdrop-filter: blur(12px); background: rgba(0,0,0,0.65); }
+}
+
+/* Применяем анимации ко всем элементам приложения */
+.modal:not(.hidden) { animation: iosFadeInBlur 0.4s var(--ios-spring) forwards !important; }
+.tg-style-profile, .rave-modal-content, .custom-context-menu, .emoji-panel, #chat-action-bar, .reply-preview {
+    animation: iosPopIn 0.45s var(--ios-bouncy) forwards !important;
+    transform-origin: center bottom;
+}
+.message-row { animation: iosSlideInUp 0.4s var(--ios-spring) forwards !important; }
+.contact-item { animation: iosSlideInUp 0.3s var(--ios-spring) forwards; }
+
+/* ===== 3. ЭФФЕКТ ЖИДКОГО СТЕКЛА (GLASSMORPHISM) ===== */
+[data-glass="on"] {
+    /* Переменные для темной темы */
+    --glass-bg: rgba(20, 25, 34, 0.45);
+    --glass-bg-solid: rgba(25, 30, 40, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-highlight: rgba(255, 255, 255, 0.05);
+    --glass-blur: blur(40px);
+    --glass-sat: saturate(200%);
+    --glass-shadow: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"][data-glass="on"] {
+    /* Переменные для светлой темы */
+    --glass-bg: rgba(255, 255, 255, 0.5);
+    --glass-bg-solid: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --glass-highlight: rgba(255, 255, 255, 0.8);
+    --glass-shadow: rgba(0, 0, 0, 0.1);
+}
+
+[data-glass="on"] .app-container { background: var(--bg-main); }
+
+/* Применяем стекло на ВСЕ панели и блоки */
+[data-glass="on"] .sidebar,
+[data-glass="on"] .settings-drawer,
+[data-glass="on"] .chat-header,
+[data-glass="on"] .chat-folders-bar,
+[data-glass="on"] .input-container,
+[data-glass="on"] .emoji-panel,
+[data-glass="on"] .tg-style-profile,
+[data-glass="on"] .rave-modal-content,
+[data-glass="on"] .custom-context-menu,
+[data-glass="on"] .reply-preview,
+[data-glass="on"] #pinned-banner,
+[data-glass="on"] #chat-action-bar,
+[data-glass="on"] .readonly-banner,
+[data-glass="on"] .mobile-bottom-nav {
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur) var(--glass-sat) !important;
+    -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat) !important;
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 10px 40px var(--glass-shadow), inset 0 1px 0 var(--glass-highlight) !important;
+}
+
+/* Делаем внутренние элементы прозрачными, чтобы стекло было видно насквозь */
+[data-glass="on"] .chat-area { background: transparent !important; }
+[data-glass="on"] .chat-folders-bar { border-radius: 0 0 20px 20px; border-top: none; }
+[data-glass="on"] .emoji-panel-header, 
+[data-glass="on"] .emoji-search,
+[data-glass="on"] .rave-modal-header,
+[data-glass="on"] .rave-modal-tabs,
+[data-glass="on"] .profile-header-actions,
+[data-glass="on"] .profile-main-info {
+    background: transparent !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+}
+
+[data-glass="on"] .rave-search-results,
+[data-glass="on"] .rave-modal-tools,
+[data-glass="on"] .context-reactions { 
+    background: transparent !important; 
+}
+
+[data-glass="on"] .profile-details-card,
+[data-glass="on"] .rave-search-card {
+    background: var(--glass-bg-solid) !important;
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+[data-glass="on"] .contact-item:hover,
+[data-glass="on"] .rave-search-card:hover,
+[data-glass="on"] .fwd-item:hover,
+[data-glass="on"] .context-actions button:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Пузыри сообщений: чуть меньше размытия для читаемости текста */
+[data-glass="on"] .bubble:not(.sticker-bubble) {
+    backdrop-filter: blur(25px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(150%) !important;
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+[data-glass="on"] .message-row.mine .bubble:not(.sticker-bubble) { 
+    background: color-mix(in srgb, var(--bubble-mine) 65%, transparent) !important; 
+}
+[data-glass="on"] .message-row.other .bubble:not(.sticker-bubble) { 
+    background: color-mix(in srgb, var(--bubble-other) 65%, transparent) !important; 
+}
+
+/* Стилизация инпутов внутри стеклянных элементов */
+[data-glass="on"] input, 
+[data-glass="on"] select, 
+[data-glass="on"] textarea {
+    background: rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--text-main) !important;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.1) !important;
+}
+
+[data-theme="light"][data-glass="on"] input,
+[data-theme="light"][data-glass="on"] select,
+[data-theme="light"][data-glass="on"] textarea {
+    background: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Красивые кнопки на стекле */
+[data-glass="on"] .primary-btn-small, 
+[data-glass="on"] .danger-btn {
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+}
+
+/* Эффекты при звонке (оставляем старые пульсации) */
+#call-overlay { background: linear-gradient(135deg, rgba(14, 22, 33, 0.95), rgba(23, 33, 43, 0.9), rgba(14, 22, 33, 0.95)) !important; background-size: 200% 200% !important; animation: callBgFlow 8s ease infinite !important; backdrop-filter: blur(35px) !important; }
+@keyframes callBgFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.call-avatar-pulse { border: 4px solid var(--primary) !important; box-shadow: 0 0 0 0 rgba(135, 116, 225, 0.5) !important; animation: callAvatarPulse 2s infinite cubic-bezier(0.66, 0, 0, 1) !important; }
+@keyframes callAvatarPulse { to { box-shadow: 0 0 0 50px rgba(135, 116, 225, 0); } }

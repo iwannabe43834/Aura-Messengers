@@ -1,0 +1,82 @@
+/* =========================================
+   VARIABLES & THEMES
+   ========================================= */
+:root {
+    /* Telegram Dark Theme (По умолчанию) */
+    --primary: #8774e1; 
+    --primary-hover: #7b66d6;
+    --primary-soft: rgba(135, 116, 225, 0.15);
+    
+    --bg-main: #0e1621; 
+    --bg-sidebar: #17212b; 
+    --bg-secondary: #242f3d; 
+    --bg-hover: #202b36;
+    
+    --text-main: #ffffff;
+    --text-dim: #7f91a4;
+    --border: #101921;
+    
+    --bubble-mine: #2b5278; 
+    --bubble-other: #182533;
+    --bubble-text-mine: #ffffff;
+    --bubble-text-other: #ffffff;
+    
+    --shadow-soft: 0 4px 15px rgba(0, 0, 0, 0.2);
+    --shadow-modal: 0 10px 40px rgba(0, 0, 0, 0.5);
+    --app-height: 100dvh;
+    
+    /* Пружинные анимации (Spring Physics) */
+    --spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --spring-bouncy: cubic-bezier(0.4, 1.8, 0.5, 1);
+
+    /* Переменные для Жидкого Стекла (iOS) */
+    --glass-bg: rgba(23, 33, 43, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-highlight: rgba(255, 255, 255, 0.15);
+    
+    /* Оттенок сообщений при включенных обоях чата */
+    --chat-tint: transparent;
+}
+
+[data-theme="light"] {
+    --primary: #3390ec; --primary-hover: #2b7dd1; --bg-main: #efebe5; --bg-sidebar: #ffffff;
+    --bg-secondary: #f4f4f5; --bg-hover: #f1f1f1; --text-main: #000000; --text-dim: #707579;
+    --border: #e4e4e5; --bubble-mine: #eeffde; --bubble-other: #ffffff; --bubble-text-mine: #000000;
+    --bubble-text-other: #000000; --glass-bg: rgba(255, 255, 255, 0.6); --glass-border: rgba(0, 0, 0, 0.1);
+    --glass-highlight: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="ocean"] {
+    --primary: #00a8cc; --primary-hover: #008ba3; --bg-main: #011627; --bg-sidebar: #012a4a;
+    --bg-secondary: #013a63; --bg-hover: #01497c; --text-main: #e0fbfc; --text-dim: #98c1d9;
+    --border: #000000; --bubble-mine: #005f73; --bubble-other: #0a243a; --glass-bg: rgba(1, 42, 74, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.08); --glass-highlight: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="sunset"] {
+    --primary: #ff5400; --primary-hover: #ff6d00; --bg-main: #2d00f7; --bg-sidebar: #2200cc;
+    --bg-secondary: #3a0ca3; --bg-hover: #480ca8; --text-main: #ffffff; --text-dim: #f72585;
+    --border: #1d009e; --bubble-mine: #ff0054; --bubble-other: #3f37c9; --glass-bg: rgba(34, 0, 204, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.15); --glass-highlight: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="neon"] {
+    --primary: #00ffcc; --primary-hover: #00e6b8; --bg-main: #000000; --bg-sidebar: #09090b;
+    --bg-secondary: #18181b; --bg-hover: #27272a; --text-main: #e4e4e7; --text-dim: #a1a1aa;
+    --border: #27272a; --bubble-mine: #006652; --bubble-other: #18181b; --glass-bg: rgba(9, 9, 11, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.1); --glass-highlight: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="forest"] {
+    --primary: #4ade80; --primary-hover: #22c55e; --bg-main: #064e3b; --bg-sidebar: #022c22;
+    --bg-secondary: #065f46; --bg-hover: #047857; --text-main: #ecfdf5; --text-dim: #a7f3d0;
+    --border: #022c22; --bubble-mine: #059669; --bubble-other: #065f46; --glass-bg: rgba(2, 44, 34, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.1); --glass-highlight: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="cyberpunk"] {
+    --primary: #ff00ff; --primary-hover: #dd00dd; --bg-main: #0f0f1a; --bg-sidebar: #05050a;
+    --bg-secondary: #1a1a2e; --bg-hover: #2a2a4e; --text-main: #00ffff; --text-dim: #a0a0b0;
+    --border: #ff00ff; --bubble-mine: #330033; --bubble-other: #1a1a2e; --glass-bg: rgba(5, 5, 10, 0.7);
+    --glass-border: rgba(255, 0, 255, 0.3); --glass-highlight: rgba(0, 255, 255, 0.2);
+}

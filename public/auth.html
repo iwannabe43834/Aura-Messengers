@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в мессенджер</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Базовые настройки */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            margin: 0; padding: 0;
+            background-color: #050505;
+            color: #ffffff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            display: flex; align-items: center; justify-content: center;
+            height: 100vh; overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== ПРЕМИАЛЬНЫЙ ФОН (Градиент + Шум) ===== */
+        .ambient-bg {
+            position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: conic-gradient(from 180deg at 50% 50%, #16123a 0deg, #050505 120deg, #0c182e 240deg, #16123a 360deg);
+            animation: rotateBg 25s linear infinite; z-index: -2;
+        }
+        @keyframes rotateBg { 100% { transform: rotate(360deg); } }
+
+        .noise-overlay {
+            position: fixed; inset: 0; z-index: -1; opacity: 0.04; pointer-events: none;
+            background-image: url('data:image/svg+xml,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+        }
+
+        /* Дополнительное свечение */
+        .glow-orb { position: absolute; border-radius: 50%; filter: blur(90px); z-index: 0; pointer-events: none; }
+        .glow-1 { width: 40vw; height: 40vw; background: rgba(135, 116, 225, 0.15); top: -10%; left: -10%; animation: pulseOrb 8s infinite alternate; }
+        .glow-2 { width: 50vw; height: 50vw; background: rgba(51, 144, 236, 0.1); bottom: -20%; right: -10%; animation: pulseOrb 12s infinite alternate-reverse; }
+        @keyframes pulseOrb { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.2); opacity: 1; } }
+
+        /* ===== КАРТОЧКА АВТОРИЗАЦИИ ===== */
+        .auth-card {
+            width: 100%; max-width: 420px; padding: 40px 35px;
+            background: rgba(15, 15, 15, 0.6);
+            backdrop-filter: blur(40px) saturate(150%); -webkit-backdrop-filter: blur(40px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 32px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            text-align: center; position: relative; z-index: 10;
+            box-sizing: border-box;
+        }
+
+        /* Анимация переходов между шагами */
+        .step-container { display: none; }
+        .step-container.active { display: block; animation: smoothSlideIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        @keyframes smoothSlideIn {
+            0% { opacity: 0; transform: translateY(20px) scale(0.97); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ===== НОВЫЙ АБСТРАКТНЫЙ ЛОГОТИП ===== */
+        .abstract-logo {
+            position: relative; width: 64px; height: 64px; margin: 0 auto 30px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .logo-orb {
+            position: absolute; width: 44px; height: 44px; border-radius: 50%;
+            mix-blend-mode: screen; animation: orbit 4s ease-in-out infinite alternate;
+        }
+        .logo-orb-1 { background: linear-gradient(135deg, #8774e1, #c4b5fd); left: 0; }
+        .logo-orb-2 { background: linear-gradient(135deg, #3390ec, #7dd3fc); right: 0; animation-delay: -2s; }
+        @keyframes orbit { 0% { transform: translateX(0) scale(1); opacity: 0.8; } 100% { transform: translateX(20px) scale(1.1); opacity: 1; } }
+
+        /* Тексты */
+        h1 { font-size: 26px; font-weight: 700; margin: 0 0 10px 0; color: #fff; letter-spacing: -0.5px; }
+        .subtitle { color: #8a99a8; font-size: 14px; margin: 0 0 30px 0; line-height: 1.5; font-weight: 400; }
+
+        /* ===== НОВЫЕ ИНПУТЫ ===== */
+        .input-wrap { position: relative; margin-bottom: 20px; text-align: left; }
+        .input-wrap input {
+            width: 100%; padding: 24px 16px 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px;
+            color: #fff; font-size: 15px; outline: none; font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease; box-sizing: border-box;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .input-wrap label {
+            position: absolute; left: 16px; top: 18px; color: #6b7d8f; font-size: 15px;
+            pointer-events: none; transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); font-weight: 400;
+        }
+        .input-wrap input:focus, .input-wrap input:not(:placeholder-shown) {
+            background: rgba(255, 255, 255, 0.06); border-color: rgba(135, 116, 225, 0.5);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 0 0 4px rgba(135, 116, 225, 0.1);
+        }
+        .input-wrap input:focus ~ label, .input-wrap input:not(:placeholder-shown) ~ label {
+            top: 8px; font-size: 11px; color: #8774e1; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        /* ===== КНОПКИ ===== */
+        .auth-btn {
+            width: 100%; padding: 16px; margin-top: 10px;
+            background: #ffffff; color: #000000;
+            border: none; border-radius: 16px;
+            font-size: 15px; font-weight: 600; font-family: 'Inter', sans-serif;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .auth-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(255,255,255,0.2); }
+        .auth-btn:active { transform: scale(0.98); }
+        .auth-btn:disabled { background: #333; color: #666; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        .auth-btn.secondary {
+            background: transparent; border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; margin-top: 12px;
+        }
+        .auth-btn.secondary:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.3); box-shadow: none; }
+
+        .auth-btn.accent { background: linear-gradient(135deg, #8774e1, #6b56c8); color: white; }
+        .auth-btn.accent:hover { box-shadow: 0 8px 25px rgba(135, 116, 225, 0.4); }
+
+        .text-link { color: #8774e1; font-size: 14px; display: inline-block; margin-top: 25px; text-decoration: none; cursor: pointer; transition: color 0.2s; font-weight: 500; }
+        .text-link:hover { color: #a395e9; }
+
+        /* ===== ШАГИ ===== */
+        .step-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; color: #6b7d8f; }
+        .step-back { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .step-back:hover { background: rgba(255,255,255,0.1); transform: translateX(-3px); }
+        .step-progress { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 20px; }
+
+        .tg-guide { background: rgba(135, 116, 225, 0.05); border: 1px solid rgba(135, 116, 225, 0.15); border-radius: 18px; padding: 18px; margin-bottom: 20px; text-align: left; }
+        .tg-guide-header { display: flex; align-items: center; gap: 8px; color: #8774e1; font-weight: 600; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+
+        #toast { position: fixed; top: 20px; left: 50%; transform: translate(-50%, -20px); background: rgba(255, 59, 48, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 12px 24px; border-radius: 20px; font-size: 14px; font-weight: 500; z-index: 9999; opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); box-shadow: 0 10px 30px rgba(255, 59, 48, 0.3); }
+        #toast.show { opacity: 1; transform: translate(-50%, 0); }
+        #toast.success { background: rgba(74, 222, 128, 0.9); box-shadow: 0 10px 30px rgba(74, 222, 128, 0.2); color: #000; border-color: rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-bg"></div>
+    <div class="noise-overlay"></div>
+    <div class="glow-orb glow-1"></div>
+    <div class="glow-orb glow-2"></div>
+    
+    <div id="toast">Ошибка</div>
+
+    <div class="auth-card">
+        
+        <div id="stepIdentify" class="step-container active">
+            <div class="abstract-logo">
+                <div class="logo-orb logo-orb-1"></div>
+                <div class="logo-orb logo-orb-2"></div>
+            </div>
+            <h1>Добро пожаловать</h1>
+            <p class="subtitle">Введите ваш логин для входа в систему</p>
+            
+            <div class="input-wrap">
+                <input type="text" id="loginInput" placeholder=" " onkeypress="if(event.key === 'Enter') identifyUser()">
+                <label>Идентификатор (Логин)</label>
+            </div>
+            
+            <button class="auth-btn" id="btnIdentify" onclick="identifyUser()">ПРОДОЛЖИТЬ</button>
+            <button class="auth-btn secondary" onclick="showStep('stepRegName')">СОЗДАТЬ АККАУНТ</button>
+        </div>
+
+        <div id="stepChooseMethod" class="step-container">
+            <div class="step-nav">
+                <button class="step-back" onclick="showStep('stepIdentify')"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <div class="abstract-logo" style="transform: scale(0.6); margin-bottom: 15px;"><div class="logo-orb logo-orb-1"></div><div class="logo-orb logo-orb-2"></div></div>
+            <h1 id="welcomeUserText">С возвращением</h1>
+            <p class="subtitle">Выберите способ подтверждения личности</p>
+            
+            <button class="auth-btn" onclick="showStep('stepPasswordLogin')">ВОЙТИ ПО ПАРОЛЮ</button>
+            <button class="auth-btn secondary" id="btnMethodTg" onclick="requestAuthCode('telegram')">КОД В TELEGRAM</button>
+        </div>
+
+        <div id="stepPasswordLogin" class="step-container">
+            <div class="step-nav">
+                <button class="step-back" onclick="showStep('stepChooseMethod')"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <h1>Авторизация</h1>
+            <p class="subtitle">Используйте ваш постоянный пароль</p>
+            
+            <div class="input-wrap">
+                <input type="password" id="loginPass" placeholder=" " onkeypress="if(event.key === 'Enter') loginWithPassword()">
+                <label>Ваш пароль</label>
+            </div>
+            
+            <button class="auth-btn" id="btnLoginPass" onclick="loginWithPassword()">ВОЙТИ В АККАУНТ</button>
+            <span class="text-link" onclick="initPasswordReset()">Забыли пароль?</span>
+        </div>
+
+        <div id="stepCode" class="step-container">
+            <div class="step-nav">
+                <button class="step-back" onclick="showStep('stepChooseMethod')"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <h1>Код доступа</h1>
+            <p class="subtitle" id="codeSubtitle">Мы отправили код в Telegram</p>
+            
+            <div class="input-wrap">
+                <input type="text" id="authCode" placeholder=" " maxlength="4" style="text-align: center; letter-spacing: 16px; font-weight: bold; font-size: 22px; font-family: monospace;" onkeypress="if(event.key === 'Enter') verifyCode()">
+                <label style="left: 50%; transform: translateX(-50%);">4 цифры</label>
+            </div>
+            
+            <button class="auth-btn" id="btnVerify" onclick="verifyCode()">ПОДТВЕРДИТЬ</button>
+        </div>
+
+        <div id="stepResetPassword" class="step-container">
+            <div class="step-nav">
+                <button class="step-back" onclick="showStep('stepPasswordLogin')"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <h1>Восстановление</h1>
+            <p class="subtitle">Сброс пароля через Telegram-бота</p>
+            
+            <div class="input-wrap">
+                <input type="text" id="resetCode" placeholder=" " maxlength="4" style="text-align: center; letter-spacing: 16px; font-weight: bold; font-size: 22px; font-family: monospace;">
+                <label style="left: 50%; transform: translateX(-50%);">Код из бота</label>
+            </div>
+            <div class="input-wrap">
+                <input type="password" id="resetPass" placeholder=" " onkeypress="if(event.key === 'Enter') resetPassword()">
+                <label>Новый пароль</label>
+            </div>
+            
+            <button class="auth-btn" id="btnReset" onclick="resetPassword()">СОХРАНИТЬ И ВОЙТИ</button>
+        </div>
+
+
+        <div id="stepRegName" class="step-container">
+            <div class="step-nav">
+                <button class="step-back" onclick="showStep('stepIdentify')"><i class="fas fa-chevron-left"></i></button>
+                <div class="step-progress">Шаг 1 из 4</div>
+                <div style="width:36px;"></div>
+            </div>
+            <h1>Как вас зовут?</h1>
+            <p class="subtitle">Введите имя, которое увидят ваши друзья</p>
+
+            <div class="input-wrap">
+                <input type="text" id="regFullName" placeholder=" " autocomplete="off" onkeypress="if(event.key === 'Enter') nextRegStep('name')">
+                <label>Ваше имя</label>
+            </div>
+            
+            <button class="auth-btn" onclick="nextRegStep('name')">ПРОДОЛЖИТЬ</button>
+        </div>
+
+        <div id="stepRegUser" class="step-container">
+            <div class="step-nav">
+                <button class="step-back" onclick="showStep('stepRegName')"><i class="fas fa-chevron-left"></i></button>
+                <div class="step-progress">Шаг 2 из 4</div>
+                <div style="width:36px;"></div>
+            </div>
+            <h1>Уникальный ник</h1>
+            <p class="subtitle">По нему вас смогут найти в поиске</p>
+
+            <div class="input-wrap">
+                <input type="text" id="regUsername" placeholder=" " autocomplete="off" onkeypress="if(event.key === 'Enter') nextRegStep('user')">
+                <label>Username (без @)</label>
+            </div>
+            
+            <button class="auth-btn" onclick="nextRegStep('user')">ПРОДОЛЖИТЬ</button>
+        </div>
+
+        <div id="stepRegPass" class="step-container">
+            <div class="step-nav">
+                <button class="step-back" onclick="showStep('stepRegUser')"><i class="fas fa-chevron-left"></i></button>
+                <div class="step-progress">Шаг 3 из 4</div>
+                <div style="width:36px;"></div>
+            </div>
+            <h1>Безопасность</h1>
+            <p class="subtitle">Придумайте надежный пароль (от 6 символов)</p>
+
+            <div class="input-wrap">
+                <input type="password" id="regPass" placeholder=" " onkeypress="if(event.key === 'Enter') nextRegStep('pass')">
+                <label>Ваш пароль</label>
+            </div>
+            
+            <button class="auth-btn" onclick="nextRegStep('pass')">ПРОДОЛЖИТЬ</button>
+        </div>
+
+        <div id="stepRegTg" class="step-container">
+            <div class="step-nav">
+                <button class="step-back" onclick="showStep('stepRegPass')"><i class="fas fa-chevron-left"></i></button>
+                <div class="step-progress">Шаг 4 из 4</div>
+                <div style="width:36px;"></div>
+            </div>
+            <h1>Резервный доступ</h1>
+            <p class="subtitle">Привяжите Telegram для безопасного восстановления пароля. Это <b>необязательно</b>.</p>
+
+            <div id="tg-bind-area" style="text-align: center; margin-bottom: 20px;">
+                <button class="auth-btn accent" style="margin-top:0;" onclick="startTgBinding(event)">
+                    <i class="fab fa-telegram-plane"></i> ПРИВЯЗАТЬ TELEGRAM
+                </button>
+            </div>
+            
+            <button class="auth-btn secondary" id="btnFinishReg" onclick="finishRegistration()">ПРОПУСТИТЬ И ВОЙТИ</button>
+        </div>
+
+    </div>
+
+    <script>
+        let identifiedUsername = ''; 
+        let currentLoginId = '';    
+        let canResetViaTelegram = false;
+        
+        let boundTgId = null;
+        let bindInterval = null;
+
+        function showToast(msg, isSuccess = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = isSuccess ? 'show success' : 'show';
+            setTimeout(() => toast.className = '', 3000);
+        }
+
+        function showStep(stepId) {
+            document.querySelectorAll('.step-container').forEach(div => div.classList.remove('active'));
+            const target = document.getElementById(stepId);
+            if(target) target.classList.add('active');
+        }
+
+        function nextRegStep(currentStep) {
+            if (currentStep === 'name') {
+                if (!document.getElementById('regFullName').value.trim()) return showToast('Введите ваше имя');
+                showStep('stepRegUser');
+                setTimeout(() => document.getElementById('regUsername').focus(), 100);
+            }
+            else if (currentStep === 'user') {
+                if (!document.getElementById('regUsername').value.trim()) return showToast('Придумайте логин');
+                showStep('stepRegPass');
+                setTimeout(() => document.getElementById('regPass').focus(), 100);
+            }
+            else if (currentStep === 'pass') {
+                if (document.getElementById('regPass').value.length < 6) return showToast('Пароль минимум 6 символов');
+                showStep('stepRegTg');
+            }
+        }
+
+        async function startTgBinding(e) {
+            e.preventDefault();
+            const btnArea = document.getElementById('tg-bind-area');
+            btnArea.innerHTML = '<i style="color:#6b7d8f; font-size:13px;">Генерация ссылки...</i>';
+
+            try {
+                const res = await fetch('/api/generate-tg-token');
+                const data = await res.json();
+                const token = data.token;
+                
+                const botName = 'AuraCode_ebot'; 
+                const link = `https://t.me/${botName}?start=${token}`;
+
+                btnArea.innerHTML = `
+                    <a href="${link}" target="_blank" class="auth-btn accent" style="text-decoration:none; display:inline-block; box-sizing:border-box;">
+                        ОТКРЫТЬ БОТА В TELEGRAM
+                    </a>
+                    <p style="font-size:12px; color:#8774e1; margin-top:15px; animation: pulseOrb 1.5s infinite alternate;">Ожидание подтверждения...</p>
+                `;
+
+                bindInterval = setInterval(async () => {
+                    const checkRes = await fetch(`/api/check-tg-token?token=${token}`);
+                    const checkData = await checkRes.json();
+                    if (checkData.bound) {
+                        clearInterval(bindInterval);
+                        boundTgId = checkData.chatId;
+                        btnArea.innerHTML = `<div style="color:#000; font-weight:bold; padding: 15px; background: rgba(74, 222, 128, 0.9); border-radius: 16px;"><i class="fas fa-check-circle"></i> Telegram успешно привязан!</div>`;
+                        
+                        const finishBtn = document.getElementById('btnFinishReg');
+                        finishBtn.textContent = "ЗАВЕРШИТЬ РЕГИСТРАЦИЮ";
+                        finishBtn.classList.remove('secondary');
+                        finishBtn.style.background = "#ffffff";
+                        finishBtn.style.color = "#000000";
+                    }
+                }, 2000);
+
+            } catch(err) {
+                btnArea.innerHTML = `<button class="auth-btn secondary" onclick="startTgBinding(event)">❌ Ошибка. Попробовать снова</button>`;
+            }
+        }
+
+        async function identifyUser() {
+            const val = document.getElementById('loginInput').value.trim();
+            if (!val) return showToast("Введите логин");
+
+            const btn = document.getElementById('btnIdentify');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/check-user', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loginId: val })
+                });
+                const result = await response.json();
+
+                if (response.ok && result.exists) {
+                    currentLoginId = val; identifiedUsername = result.username; canResetViaTelegram = result.hasTelegram;
+                    document.getElementById('welcomeUserText').innerText = `@${result.username}`;
+                    document.getElementById('btnMethodTg').style.display = result.hasTelegram ? 'block' : 'none';
+                    showStep('stepChooseMethod');
+                } else { showToast("Пользователь не найден"); }
+            } catch (e) { showToast("Ошибка сервера"); } finally { btn.disabled = false; }
+        }
+
+        async function requestAuthCode(method, isReset = false) {
+            try {
+                const response = await fetch('/api/send-auth-code', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: identifiedUsername, method: method, isReset: isReset })
+                });
+                const res = await response.json();
+                if (response.ok) {
+                    if (isReset) { showStep('stepResetPassword'); } 
+                    else {
+                        document.getElementById('authCode').value = '';
+                        showStep('stepCode');
+                        setTimeout(() => document.getElementById('authCode').focus(), 100);
+                    }
+                } else { showToast(res.error); }
+            } catch (e) { showToast("Ошибка сети"); }
+        }
+
+        async function loginWithPassword() {
+            const pass = document.getElementById('loginPass').value;
+            if (!pass) return showToast("Введите пароль");
+
+            const btn = document.getElementById('btnLoginPass');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/login-password', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ loginId: currentLoginId, password: pass })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    localStorage.setItem('username', result.user.username);
+                    window.location.href = "/index.html";
+                } else { showToast(result.error || "Неверный пароль"); }
+            } catch (e) { showToast("Ошибка авторизации"); } finally { btn.disabled = false; }
+        }
+
+        async function verifyCode() {
+            const code = document.getElementById('authCode').value.trim();
+            if (code.length < 4) return;
+
+            const btn = document.getElementById('btnVerify');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/verify-code', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: identifiedUsername, code: code }) 
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    localStorage.setItem('username', result.user.username);
+                    window.location.href = "/index.html";
+                } else { showToast(result.error || "Неверный код"); document.getElementById('authCode').value = ''; }
+            } catch (e) { showToast("Ошибка сервера"); } finally { btn.disabled = false; }
+        }
+
+        function initPasswordReset() {
+            if (!canResetViaTelegram) return showToast("Telegram не привязан. Восстановление невозможно.");
+            requestAuthCode('telegram', true);
+        }
+
+        async function resetPassword() {
+            const code = document.getElementById('resetCode').value.trim();
+            const newPass = document.getElementById('resetPass').value;
+
+            if (code.length < 4) return showToast("Введите 4 цифры");
+            if (newPass.length < 6) return showToast("Новый пароль от 6 символов");
+
+            const btn = document.getElementById('btnReset');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/reset-password', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: identifiedUsername, code: code, newPassword: newPass })
+                });
+                if (response.ok) {
+                    localStorage.setItem('username', identifiedUsername);
+                    window.location.href = "/index.html";
+                } else {
+                    const res = await response.json(); showToast(res.error);
+                }
+            } catch (e) { showToast("Ошибка сети"); } finally { btn.disabled = false; }
+        }
+
+        async function finishRegistration() {
+            const name = document.getElementById('regFullName').value.trim();
+            const user = document.getElementById('regUsername').value.trim();
+            const pass = document.getElementById('regPass').value;
+
+            const btn = document.getElementById('btnFinishReg');
+            btn.disabled = true; btn.textContent = "ЗАГРУЗКА...";
+
+            try {
+                const response = await fetch('/api/register-final', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        fullname: name, username: user, 
+                        telegramId: boundTgId, password: pass 
+                    })
+                });
+                
+                if (response.ok) {
+                    localStorage.setItem('username', user);
+                    window.location.href = "/index.html";
+                } else {
+                    const err = await response.json();
+                    showToast(err.error || "Этот логин уже занят");
+                    if (err.error && err.error.includes("занят")) showStep('stepRegUser');
+                }
+            } catch (e) { showToast("Ошибка сети"); } finally {
+                btn.disabled = false;
+                btn.textContent = boundTgId ? "ЗАВЕРШИТЬ РЕГИСТРАЦИЮ" : "ПРОПУСТИТЬ И ВОЙТИ";
+            }
+        }
+    </script>
+</body>
+</html>

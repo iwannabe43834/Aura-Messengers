@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <script>
+        if (!localStorage.getItem('username')) {
+            if (window.location.pathname.length > 1) {
+                localStorage.setItem('redirect_after_login', window.location.pathname);
+            }
+            window.location.href = '/auth.html'; 
+        }
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Aura Messenger</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#8774e1">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="pattern-none" id="app-body" data-theme="dark" data-lang="ru">
+
+<audio id="snd-send" src="/send.mp3" preload="auto"></audio>
+<audio id="snd-notify" src="/notify.mp3" preload="auto"></audio>
+
+<div id="story-viewer-overlay" class="story-viewer-overlay" onclick="closeStory(event)">
+    <div class="story-content-wrap" id="story-content-wrap">
+        <div class="story-progress-bar"><div class="story-progress-fill" id="story-progress-fill"></div></div>
+        <div class="story-header">
+            <img id="story-viewer-avatar" src="" style="display:none; background: var(--primary);">
+            <div id="story-viewer-avatar-text" class="story-avatar-text" style="display:none; width:40px;height:40px;border-radius:50%;background:var(--primary);align-items:center;justify-content:center;color:white;font-weight:bold;font-size:1.2rem;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; margin-left: 12px;">
+                <span id="story-viewer-name" style="font-size: 1.1rem; color: white;">Name</span>
+                <span id="story-viewer-time" style="font-size: 0.8rem; font-weight: normal; opacity: 0.8; color: white;">Время</span>
+            </div>
+            <button class="danger-btn-small hidden" id="story-delete-btn" onclick="deleteCurrentStory()" style="margin-right: 15px; padding: 8px 12px;"><i class="fas fa-trash"></i></button>
+            <button class="story-close" onclick="closeStory(true)"><i class="fas fa-times"></i></button>
+        </div>
+        <img id="story-viewer-img" class="story-media hidden">
+        <video id="story-viewer-vid" class="story-media hidden" autoplay playsinline></video>
+        <div class="story-footer" id="story-footer">
+            <div id="story-reactions-bar" class="story-reactions-bar hidden">
+                <span onclick="reactToStory('👍')">👍</span><span onclick="reactToStory('❤️')">❤️</span><span onclick="reactToStory('😂')">😂</span><span onclick="reactToStory('😮')">😮</span><span onclick="reactToStory('😢')">😢</span><span onclick="reactToStory('🔥')">🔥</span>
+            </div>
+            <div id="story-views-bar" class="story-views-bar hidden">
+                <div style="margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px; color: white;"><i class="fas fa-eye"></i> Просмотры: <span id="story-views-count">0</span></div>
+                <div id="story-views-list" class="story-views-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="call-overlay" class="modal hidden" style="z-index: 3000; transition: opacity 0.3s ease;">
+    <div id="call-ui-content" class="modal-content" style="text-align:center; padding: 40px 20px; border: none; box-shadow: none; background: transparent; height: 100%; display: flex; flex-direction: column; justify-content: center;">
+        <div class="avatar-huge call-avatar-pulse" id="call-avatar" style="margin: 0 auto 20px; width: 130px; height: 130px; font-size: 3.5rem; display: flex; align-items: center; justify-content: center; color: white; border-radius: 50%;"></div>
+        <h2 id="call-name" style="font-size: 2.2rem; margin-bottom: 5px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); color: #fff;">Name</h2>
+        <p id="call-status-text" style="color: rgba(255,255,255,0.7); font-size: 1.2rem; margin-bottom: 40px; font-weight: 300; letter-spacing: 1px;">Звонит...</p>
+        <div id="incoming-call-actions" class="hidden" style="display:flex; justify-content:center; gap:40px; margin-top: 20px;">
+            <button onclick="acceptCall()" style="background:#4ade80; color:#fff; border:none; border-radius:50%; width:75px; height:75px; font-size:2rem; cursor:pointer; box-shadow: 0 10px 25px rgba(74,222,128,0.4); transition: 0.2s; flex-shrink: 0;"><i class="fas fa-phone"></i></button>
+            <button onclick="rejectCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:75px; height:75px; font-size:2rem; cursor:pointer; box-shadow: 0 10px 25px rgba(255,59,48,0.4); transition: 0.2s; flex-shrink: 0;"><i class="fas fa-phone-slash"></i></button>
+        </div>
+        <div id="active-call-actions" class="hidden" style="display:flex; justify-content:center; gap:20px; position: absolute; bottom: 50px; left: 0; width: 100%; z-index: 10; padding: 20px; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);">
+            <button onclick="toggleVideo()" id="video-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;"><i class="fas fa-video"></i></button>
+            <button onclick="toggleAudio()" id="audio-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;"><i class="fas fa-microphone"></i></button>
+            <button onclick="toggleRemoteAudio()" id="remote-audio-toggle-btn" style="background:rgba(255,255,255,0.2); backdrop-filter: blur(10px); color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; transition: 0.2s; flex-shrink: 0;"><i class="fas fa-volume-up"></i></button>
+            <button onclick="endCall()" style="background:#ff3b30; color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.3rem; cursor:pointer; box-shadow: 0 5px 15px rgba(255,59,48,0.4); transition: 0.2s; flex-shrink: 0;"><i class="fas fa-phone-slash"></i></button>
+        </div>
+    </div>
+    <div id="video-container" class="hidden" style="position:absolute; top:0; left:0; width:100%; height:100%; background:#000; z-index: 1;">
+         <video id="remote-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+         <video id="local-video" autoplay playsinline muted style="width:120px; height:180px; position:absolute; bottom:140px; right:20px; border-radius:16px; object-fit:cover; border:2px solid rgba(255,255,255,0.5); box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 5;"></video>
+    </div>
+</div>
+
+<div class="app-container" id="main-container">
+    <div id="liquid-bg" class="liquid-bg hidden"><div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div></div>
+    <div id="toast-container" class="toast-container"></div>
+
+    <div id="msg-context-menu" class="custom-context-menu hidden">
+        <div class="context-reactions">
+            <span onclick="contextReact('👍')">👍</span><span onclick="contextReact('❤️')">❤️</span><span onclick="contextReact('😂')">😂</span><span onclick="contextReact('😮')">😮</span><span onclick="reactToStory('😢')">😢</span><span onclick="contextReact('🔥')">🔥</span>
+        </div>
+        <div class="context-actions">
+            <button onclick="contextReply()"><i class="fas fa-reply"></i> <span data-i18n="reply">Ответить</span></button>
+            <button id="ctx-forward-btn" onclick="contextForward()"><i class="fas fa-share"></i> <span data-i18n="forward">Переслать</span></button>
+            <button id="ctx-edit-btn" onclick="contextEdit()"><i class="fas fa-pencil-alt"></i> <span>Изменить</span></button>
+            <button id="ctx-pin-btn" onclick="contextPin()"><i class="fas fa-thumbtack"></i> <span>Закрепить</span></button>
+            <button class="danger" onclick="contextDelete()"><i class="fas fa-trash"></i> <span data-i18n="delete">Удалить</span></button>
+        </div>
+    </div>
+
+    <div id="forward-modal" class="modal hidden" onclick="closeModalOnOuterClick(event, 'forward-modal')" style="z-index: 2600;">
+        <div class="modal-content tg-style-profile" style="padding: 20px 0; height: auto; max-height: 80vh; display: flex; flex-direction: column;">
+            <div class="profile-main-info" style="flex-shrink: 0; padding-bottom: 0;">
+                <h2 style="font-size: 1.3rem;">Переслать сообщение</h2>
+            </div>
+            <div class="search-wrapper" style="padding: 15px 20px; flex-shrink: 0;">
+                <i class="fas fa-search"></i>
+                <input type="text" id="forward-search" placeholder="Поиск чата..." oninput="filterForwardChats()">
+            </div>
+            <div id="forward-chats-list" class="contacts-list" style="overflow-y: auto; flex: 1; padding: 0 10px; max-height: 400px;"></div>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="modal hidden" onclick="closeProfile(event)" style="z-index: 2000;">
+        <div class="modal-content tg-style-profile">
+            <div class="profile-header-actions"><button class="close-profile-btn" onclick="toggleProfileModal(false)"><i class="fas fa-times"></i></button><button class="admin-edit-btn hidden" id="p-btn-edit" onclick="openEditGroupModal()"><i class="fas fa-pencil-alt"></i></button></div>
+            <div class="profile-cover pattern-none" id="p-cover"></div> 
+            <div class="profile-scroll-area">
+                <div class="profile-avatar-container"><div class="profile-avatar-large" id="p-avatar"></div></div>
+                <div class="profile-main-info"><h2 id="p-name">Имя <span id="p-emoji-status" class="emoji-status-badge hidden"></span></h2><p id="p-status">загрузка статуса...</p></div>
+                <div class="profile-actions-row" id="p-actions-row"><button class="tg-action-btn" id="p-btn-message"><i class="fas fa-comment"></i><span data-i18n="writeMsg">Написать</span></button><button class="tg-action-btn" id="p-btn-contact" onclick="toggleContact()"><i class="fas fa-user-plus" id="p-icon-contact"></i><span id="p-text-contact" data-i18n="addContact">В контакты</span></button><button class="tg-action-btn block-btn" id="p-btn-block" onclick="toggleBlock()"><i class="fas fa-ban"></i><span id="p-text-block" data-i18n="blockUser">Заблокировать</span></button><button class="tg-action-btn block-btn hidden" id="p-btn-leave" onclick="leaveGroup()"><i class="fas fa-sign-out-alt"></i><span data-i18n="leaveGroup">Покинуть</span></button></div>
+                <div class="profile-details-card">
+                    <div class="detail-row"><i class="fas fa-info-circle detail-icon"></i><div class="detail-text-block"><span class="detail-value" id="p-bio">...</span><span class="detail-label" id="p-bio-label" data-i18n="aboutMe">О себе</span></div></div>
+                    <div class="detail-separator" id="p-sep-1"></div>
+                    <div class="detail-row hidden" id="p-row-location"><i class="fas fa-map-marker-alt detail-icon"></i><div class="detail-text-block"><span class="detail-value" id="p-location">Не указан</span><span class="detail-label" data-i18n="locationLabel">Город / Локация</span></div></div>
+                    <div class="detail-row hidden" id="p-row-website"><i class="fas fa-link detail-icon"></i><div class="detail-text-block"><a href="#" class="detail-value" id="p-website" target="_blank" style="color:var(--primary); text-decoration:none;">Не указан</a><span class="detail-label" data-i18n="websiteLabel">Веб-сайт</span></div></div>
+                    <div class="detail-row" id="p-row-birthday"><i class="fas fa-birthday-cake detail-icon"></i><div class="detail-text-block"><span class="detail-value" id="p-birthday">Не указан</span><span class="detail-label" data-i18n="birthday">День рождения</span></div></div>
+                    <div class="detail-row hidden" id="p-row-members" style="flex-direction: column; align-items: flex-start;"><div style="display:flex; align-items:center; gap:15px; width:100%; margin-bottom: 10px;"><i class="fas fa-users detail-icon"></i><div class="detail-text-block"><span class="detail-value" id="p-members-count">0</span><span class="detail-label" data-i18n="membersCount">Участников</span></div></div><div id="p-members-list" class="group-members-manage-list" style="width: 100%; display: none;"></div></div>
+                    <div class="detail-separator"></div>
+                    <div class="detail-row"><i class="fas fa-at detail-icon"></i><div class="detail-text-block"><span class="detail-value" id="p-username">@username</span><span class="detail-label" data-i18n="username">Имя пользователя / ID</span></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="custom-contact-modal" class="modal hidden" onclick="closeModalOnOuterClick(event, 'custom-contact-modal')" style="z-index: 2100;">
+        <div class="modal-content tg-style-profile" style="padding: 20px 0; height: auto;"><div class="profile-main-info"><h2 data-i18n="addContactTitle">Добавить контакт</h2><p data-i18n="addContactDesc" style="margin-bottom: 20px;">Введите имя, под которым этот пользователь будет отображаться у вас.</p></div><div class="modal-form-group"><label data-i18n="customNameLabel">Имя контакта</label><input type="text" id="contact-custom-name" placeholder="Например: Братишка"></div><div style="padding: 0 20px;"><button class="primary-btn-small" style="width: 100%;" onclick="saveContact()" data-i18n="saveContactBtn">Сохранить</button></div></div>
+    </div>
+    <div id="create-group-modal" class="modal hidden" onclick="closeModalOnOuterClick(event, 'create-group-modal')" style="z-index: 2100;">
+        <div class="modal-content tg-style-profile" style="padding: 20px 0; max-height: 90vh; overflow-y: auto;">
+            <div class="profile-header-actions"><button class="close-profile-btn" onclick="toggleCreateGroupModal(false)"><i class="fas fa-times"></i></button></div>
+            <div class="profile-main-info"><h2 id="modal-group-title" data-i18n="createGroup">Создать сообщество</h2></div>
+            <div class="type-selector" id="group-type-selector"><input type="radio" id="type-group" name="chat-type" value="group" checked><label for="type-group" data-i18n="typeGroup">Группа</label><input type="radio" id="type-channel" name="chat-type" value="channel"><label for="type-channel" data-i18n="typeChannel">Канал</label></div>
+            <input type="file" id="group-avatar-input" style="display:none" accept="image/*" onchange="previewGroupAvatar(this)"><input type="file" id="group-bg-input" style="display:none" accept="image/*" onchange="previewGroupBg(this)">
+            <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 15px;"><div class="group-avatar-upload" id="group-avatar-preview" onclick="document.getElementById('group-avatar-input').click()" title="Аватар группы"><i class="fas fa-camera"></i></div><div class="group-avatar-upload" id="group-bg-preview" onclick="document.getElementById('group-bg-input').click()" style="border-radius: 12px; border-style: dashed;" title="Обложка группы"><i class="fas fa-image"></i></div></div>
+            <div class="modal-form-group"><label>ЦВЕТ ПРОФИЛЯ ГРУППЫ</label><input type="color" id="group-color-input" value="#8774e1" style="height: 45px; padding: 5px; border-radius: 12px;"></div>
+            <div class="modal-form-group" id="group-id-wrapper"><label data-i18n="groupUsername">Идентификатор (@)</label><input type="text" id="group-id-input" placeholder="my_cool_channel"></div>
+            <div class="modal-form-group"><label data-i18n="groupName">Название</label><input type="text" id="group-name-input" placeholder="Название"></div>
+            <div class="modal-form-group"><label data-i18n="groupDesc">Описание</label><textarea id="group-desc-input" placeholder="О чем этот чат..." rows="2"></textarea></div>
+            <div class="modal-form-group" id="group-members-wrapper"><label data-i18n="addMembers">Добавить участников</label><div class="members-select-list" id="group-members-list"></div></div>
+            <div style="padding: 0 20px; margin-top: 10px;"><button class="primary-btn-small" id="submit-group-btn" style="width: 100%;" onclick="submitCreateGroup('group')" data-i18n="createGroupBtn">Создать</button></div>
+        </div>
+    </div>
+    <div id="create-rave-modal" class="modal hidden" onclick="closeModalOnOuterClick(event, 'create-rave-modal')" style="z-index: 2100;">
+        <div class="modal-content tg-style-profile" style="padding: 20px 0; max-height: 90vh; overflow-y: auto;">
+            <div class="profile-header-actions"><button class="close-profile-btn" onclick="toggleCreateRaveModal(false)"><i class="fas fa-times"></i></button></div>
+            <div class="profile-main-info"><h2>Создать Кинозал 🍿</h2><p style="color: #ff3b30; font-size: 0.8rem; margin-top: 5px;">⚠️ Максимум 10 участников</p></div>
+            <input type="file" id="rave-avatar-input" style="display:none" accept="image/*" onchange="previewRaveAvatar(this)"><input type="file" id="rave-bg-input" style="display:none" accept="image/*" onchange="previewRaveBg(this)">
+            <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 15px;"><div class="group-avatar-upload" id="rave-avatar-preview" onclick="document.getElementById('rave-avatar-input').click()" title="Аватар"><i class="fas fa-camera"></i></div><div class="group-avatar-upload" id="rave-bg-preview" onclick="document.getElementById('rave-bg-input').click()" style="border-radius: 12px; border-style: dashed;" title="Обложка"><i class="fas fa-image"></i></div></div>
+            <div class="modal-form-group"><label>ИДЕНТИФИКАТОР (@)</label><input type="text" id="rave-id-input" placeholder="movie_night"></div><div class="modal-form-group"><label>НАЗВАНИЕ КИНОЗАЛА</label><input type="text" id="rave-name-input" placeholder="Смотрим Шрека"></div><div class="modal-form-group"><label>ПРИГЛАСИТЬ ДРУЗЕЙ</label><div class="members-select-list" id="rave-members-list"></div></div>
+            <div style="padding: 0 20px; margin-top: 10px;"><button class="primary-btn-small" style="width: 100%; background: linear-gradient(45deg, #ff0054, #3a0ca3);" onclick="submitCreateRave()">Создать Кинозал</button></div>
+        </div>
+    </div>
+    
+    <div id="settings-drawer" class="settings-drawer">
+        <div class="drawer-header"><button class="back-btn" onclick="toggleSettings(false)"><i class="fas fa-arrow-left"></i></button><h3 data-i18n="settings">Настройки</h3></div>
+        <div class="drawer-content">
+            <div class="user-profile-preview pattern-none" id="settings-cover-preview"><div class="avatar-huge" id="user-avatar-main"></div><h2 id="settings-full-name" style="margin-top:10px;">Имя</h2><p id="settings-username-display" style="color: var(--text-dim);">@username</p></div>
+            <div class="settings-tabs"><button class="tab-btn active" onclick="switchSettingsTab('general')" data-i18n="general">Профиль</button><button class="tab-btn" onclick="switchSettingsTab('appearance')" data-i18n="appearance">Внешний вид</button><button class="tab-btn" onclick="switchSettingsTab('privacy')">Приватность</button></div>
+            <div class="settings-list-container">
+                <div class="settings-list tab-content active" id="tab-general">
+                    <div class="settings-input-group"><label data-i18n="yourNameLabel">ВАШЕ ИМЯ</label><input type="text" id="edit-display-name"></div>
+                    <div class="settings-input-group"><label data-i18n="aboutMeLabel">О СЕБЕ</label><input type="text" id="edit-bio" placeholder="Расскажите немного о себе..."></div>
+                    <div class="settings-input-group"><label data-i18n="locationLabel">ГОРОД / ЛОКАЦИЯ</label><input type="text" id="edit-location" placeholder="Например: Москва"></div>
+                    <div class="settings-input-group"><label data-i18n="websiteLabel">ВЕБ-САЙТ</label><input type="url" id="edit-website" placeholder="https://..."></div>
+                    <div class="settings-input-group"><label data-i18n="birthdayLabel">ДЕНЬ РОЖДЕНИЯ</label><input type="date" id="edit-birthday"></div>
+                    <button class="primary-btn-small" onclick="saveProfileGeneral()" data-i18n="saveChanges">Сохранить изменения</button>
+                    <div class="settings-divider"></div><button class="danger-btn" onclick="logoutApp()"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">Выйти из аккаунта</span></button>
+                </div>
+                <div class="settings-list tab-content" id="tab-appearance">
+                    <div style="display:flex; gap: 10px; margin-bottom: 10px;"><input type="file" id="avatar-file-input" style="display:none" accept="image/*" onchange="uploadAvatar(this)"><button class="primary-btn-small" style="margin-top:0;" onclick="document.getElementById('avatar-file-input').click()"><i class="fas fa-camera"></i> Аватар</button><input type="file" id="bg-file-input" style="display:none" accept="image/*,video/*" onchange="uploadProfileBg(this)"><button class="primary-btn-small" style="margin-top:0; background: var(--bg-hover); color: var(--text-main);" onclick="document.getElementById('bg-file-input').click()"><i class="fas fa-image"></i> Обложка</button></div>
+                    <div class="settings-input-group"><label>ЦВЕТ ПРОФИЛЯ</label><input type="color" id="edit-profile-color" style="height: 45px; padding: 5px; width: 100%; border-radius: 12px;"></div>
+                    <div class="settings-input-group">
+                        <label>ЭМОДЗИ-СТАТУС</label>
+                        <select id="edit-emoji-status"><option value="">Без статуса</option><option value="☕️">☕️ Пью кофе</option><option value="💼">💼 На работе</option><option value="🎮">🎮 Играю</option><option value="💤">💤 Сплю</option><option value="🎧">🎧 Слушаю музыку</option><option value="✈️">✈️ В пути</option><option value="🏋️‍♂️">🏋️‍♂️ Тренировка</option><option value="❤️">❤️ Влюблен</option><option value="🔥">🔥 В огне</option></select>
+                    </div>
+                    <div class="settings-input-group"><label data-i18n="glassEffectLabel">ЭФФЕКТ ЖИДКОГО СТЕКЛА</label><select id="glass-select" onchange="changeGlassEffect(this.value)"><option value="off" data-i18n="off">Выкл</option><option value="on" data-i18n="on">Вкл</option></select></div>
+                    <div class="settings-input-group"><label data-i18n="themeLabel">ЦВЕТОВАЯ ТЕМА</label><select id="theme-select" onchange="changeTheme(this.value)"><option value="dark">Темная (Default)</option><option value="light">Светлая</option><option value="ocean">Океан</option><option value="sunset">Закат</option><option value="neon">Неон</option><option value="forest">Лес</option><option value="cyberpunk">Cyberpunk</option></select></div>
+                    <div class="settings-input-group"><label data-i18n="profilePatternLabel">УЗОР ОБЛОЖКИ ПРОФИЛЯ</label><select id="profile-pattern-select" onchange="changeProfilePattern(this.value)"><option value="none" data-i18n="noPattern">Без узора</option><option value="dots" data-i18n="patternDots">Точки</option><option value="grid" data-i18n="patternGrid">Сетка</option><option value="tg-pattern" data-i18n="patternTelegram">Telegram Pattern</option></select></div>
+                    <button class="primary-btn-small" onclick="saveProfileAppearance()">Применить внешний вид</button>
+                </div>
+                <div class="settings-list tab-content" id="tab-privacy">
+                    <div class="settings-input-group"><label>КТО МОЖЕТ МНЕ ЗВОНИТЬ</label><select id="priv-calls"><option value="all">Все пользователи</option><option value="contacts">Мои контакты</option><option value="nobody">Никто</option></select></div><div class="settings-input-group"><label>КТО ВИДИТ МОЙ ОНЛАЙН</label><select id="priv-online"><option value="all">Все пользователи</option><option value="contacts">Мои контакты</option><option value="nobody">Никто</option></select></div><div class="settings-input-group"><label>ПРИГЛАШЕНИЯ В ГРУППЫ</label><select id="priv-groups"><option value="all">Все пользователи</option><option value="contacts">Только контакты</option></select></div>
+                    <button class="primary-btn-small" onclick="savePrivacySettings()">Сохранить приватность</button>
+                    <div class="settings-divider"></div><p style="font-size: 0.8rem; color: var(--text-dim); text-align: center;"><i class="fas fa-shield-alt"></i> Aura Security</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="header-top">
+                <button class="menu-btn" onclick="toggleSettings(true)"><i class="fas fa-bars"></i></button>
+                <h2 id="logo-text">Aura</h2><div style="flex:1"></div>
+                <div class="header-top-buttons"><button class="btn-rave-create" onclick="toggleCreateRaveModal(true)" title="Создать Кинозал"><i class="fas fa-film"></i> Rave</button><button class="menu-btn" onclick="toggleCreateGroupModal(true)" title="Создать чат"><i class="fas fa-pen-to-square"></i></button></div>
+            </div>
+            <div class="search-wrapper"><i class="fas fa-search"></i><input type="text" id="searchUser" placeholder="Поиск @ID..." data-i18n-placeholder="searchPlaceholder"></div>
+        </div>
+        <div id="tab-content-chats" class="mobile-tab-content active">
+            <input type="file" id="story-upload-input" accept="image/*,video/*" style="display: none;" onchange="uploadStoryFile(this)">
+            <div id="stories-container" class="stories-container"></div>
+            <div class="contacts-list">
+                <div class="saved-messages-item" onclick="openChat('me')"><div class="saved-icon"><i class="fas fa-bookmark"></i></div><div class="contact-info"><strong data-i18n="savedMessages">Избранное</strong><div class="contact-subtext" data-i18n="savedSubtext">Личное хранилище</div></div></div>
+                <div id="contacts"></div>
+            </div>
+        </div>
+        <div id="tab-content-contacts" class="mobile-tab-content hidden"><div style="padding: 15px; font-weight: bold; color: var(--text-dim); text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Мои контакты</div><div class="contacts-list" id="real-contacts-list"></div></div>
+        <div id="tab-content-calls" class="mobile-tab-content hidden"><div style="padding: 15px; font-weight: bold; color: var(--text-dim); text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">История звонков</div><div class="contacts-list" id="calls-list-container"></div></div>
+    </aside>
+
+    <nav class="mobile-bottom-nav">
+        <button class="nav-item" onclick="switchMobileTab('contacts', this)"><i class="fas fa-user-circle"></i><span>Контакты</span></button>
+        <button class="nav-item" onclick="switchMobileTab('calls', this)"><i class="fas fa-phone-alt"></i><span>Звонки</span></button>
+        <button class="nav-item active" onclick="switchMobileTab('chats', this)"><i class="fas fa-comments"></i><span>Чаты</span><div class="nav-badge" id="total-unread-badge"></div></button>
+        <button class="nav-item" onclick="switchMobileTab('settings', this)"><i class="fas fa-cog"></i><span>Настройки</span></button>
+    </nav>
+
+    <main class="chat-area" id="chat-area-main">
+        <div class="chat-bg-layer" id="chat-bg-layer"></div>
+        <div id="welcome-screen" class="welcome-screen"><div class="welcome-content"><div class="icon">✨</div><h3 data-i18n="selectChat">Выберите чат</h3><p data-i18n="secureMessages">Ваши сообщения защищены Aura</p></div></div>
+
+        <div id="chat-ui" class="chat-ui hidden">
+            <header class="chat-header" id="chat-main-header" style="justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="mobile-back-btn" onclick="closeChatMobile()"><i class="fas fa-arrow-left"></i></button>
+                    <div class="chat-header-avatar" id="chat-header-avatar"></div>
+                    <div class="chat-info" id="chat-header-info" style="cursor: pointer;"><strong id="chat-with-title">Загрузка... <span id="chat-emoji-status" class="emoji-status-badge hidden"></span></strong><span class="status" id="chat-status"></span></div>
+                </div>
+                <div style="position: relative;">
+                    <button class="header-menu-btn" onclick="toggleChatHeaderMenu(event)"><i class="fas fa-ellipsis-v"></i></button>
+                    <div id="chat-header-dropdown" class="custom-context-menu hidden" style="position: absolute; right: 0; top: 100%; margin-top: 10px; width: 240px; z-index: 100;">
+                        <div class="context-actions">
+                            <button id="btn-call-audio" onclick="makeCall(false)"><i class="fas fa-phone"></i> Аудиозвонок</button><button id="btn-call-video" onclick="makeCall(true)"><i class="fas fa-video"></i> Видеозвонок</button><button id="btn-call-screen" onclick="startScreenShare()"><i class="fas fa-desktop"></i> Демонстрация экрана</button><button onclick="toggleChatSearch()"><i class="fas fa-search"></i> Поиск сообщений</button><input type="file" id="wallpaper-upload-input" accept="image/*" style="display:none" onchange="setChatWallpaper(this)"><button onclick="document.getElementById('wallpaper-upload-input').click()"><i class="fas fa-image"></i> Изменить обои чата</button><button onclick="resetChatWallpaper()" style="color: #ff3b30;"><i class="fas fa-trash-alt"></i> Сбросить обои</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="chat-search-bar" class="hidden" style="padding: 10px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; gap: 10px;">
+                <input type="text" id="chat-search-input" placeholder="Поиск сообщений..." style="flex:1; padding:8px 15px; border-radius:15px; border:1px solid var(--border); background:var(--bg-main); color:white; outline:none;"><button style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:1.2rem;" onclick="performChatSearch()"><i class="fas fa-check"></i></button><button style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1.2rem;" onclick="toggleChatSearch()"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div id="pinned-banner" class="hidden" style="background: var(--bg-secondary); padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; cursor: pointer; z-index: 11; transition: 0.3s;"><i class="fas fa-thumbtack" style="color: var(--primary);"></i><div style="flex: 1; overflow: hidden;"><div style="color: var(--primary); font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">Закрепленное сообщение</div><div id="pinned-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 0.9rem; color: var(--text-main);"></div></div></div>
+
+            <div id="rave-container" class="rave-container hidden">
+                <div class="rave-video-wrapper" id="rave-video-wrapper">
+                    <div id="rave-viewer-overlay" class="hidden" onclick="joinRaveSync()" style="position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:20; display:flex; align-items:center; justify-content:center; flex-direction:column; cursor:pointer; backdrop-filter: blur(5px); pointer-events: auto !important;"><i class="fas fa-play-circle" style="font-size: 4rem; color: var(--primary); margin-bottom: 15px; border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.5);"></i><span style="color: white; font-weight: bold; font-size: 1.1rem;">Синхронизировать плеер</span><span style="color: var(--text-dim); font-size: 0.8rem; margin-top: 5px;">(Нажмите для включения звука и видео)</span></div>
+                    <div id="rave-placeholder" class="rave-placeholder"><i class="fas fa-film"></i><p>Кинозал готов. Ждем видео от хоста...</p></div>
+                    <video id="rave-html-player" class="hidden" style="width:100%; height:100%;"></video>
+                    <div id="rave-iframe-container" class="hidden" style="width:100%; height:100%;"></div>
+                </div>
+                <div id="rave-host-controls" class="rave-host-controls hidden">
+                    <span id="rave-host-status" style="color: #4ade80; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; display:block; padding: 15px 15px 0 15px;"><i class="fas fa-crown"></i> Вы управляете видео (Хост)</span>
+                    <button onclick="toggleRavePanel()" class="rave-toggle-btn"><i class="fas fa-search"></i> Поиск видео <i class="fas fa-chevron-down" id="rave-toggle-icon"></i></button>
+                    <div id="rave-panel-content" class="rave-panel-content hidden">
+                        <div class="rave-input-group"><select id="rave-source-type" class="rave-select"><option value="youtube">YouTube</option><option value="vk">VK Видео</option><option value="rutube">RuTube</option><option value="direct">Прямая ссылка (.mp4)</option></select><input type="text" id="rave-url-input" placeholder="Поиск видео или ссылка..." class="rave-input" onkeypress="if(event.key === 'Enter') searchRaveVideo()"><button onclick="searchRaveVideo()" class="primary-btn-small" style="margin: 0; width: auto; border-radius: 12px; padding: 0 20px;"><i class="fas fa-search"></i></button></div>
+                        <div id="rave-search-results" class="rave-search-results hidden"></div>
+                    </div>
+                    <div class="rave-playback-controls"><button onclick="raveHostAction('play')" class="rave-ctrl-btn"><i class="fas fa-play"></i></button><button onclick="raveHostAction('pause')" class="rave-ctrl-btn"><i class="fas fa-pause"></i></button><button onclick="raveHostAction('sync')" class="rave-ctrl-btn sync"><i class="fas fa-sync"></i> Синхрон</button></div>
+                </div>
+            </div>
+
+            <div id="messages" class="messages-container"></div>
+
+            <div id="reply-preview" class="reply-preview hidden">
+                <div class="reply-content"><small id="reply-user"></small><div id="reply-text"></div></div><button class="close-reply" onclick="cancelReply()">✕</button>
+            </div>
+
+            <div class="input-container" id="input-container">
+                <input type="file" id="mediaInput" style="display:none" accept="image/*,video/*,audio/*" onchange="sendMediaFile(this)">
+                <button class="attach-btn" id="attachBtn" onclick="document.getElementById('mediaInput').click()"><i class="fas fa-paperclip"></i></button>
+                <input type="text" id="msgInput" placeholder="Напишите сообщение..." autocomplete="off" data-i18n-placeholder="writeMessage">
+                <button id="sendBtn" class="action-btn hidden"><i class="fas fa-paper-plane"></i></button>
+                <button id="micBtn" class="action-btn"><i class="fas fa-microphone"></i></button>
+                <div id="record-ui" class="record-ui hidden"><div class="record-timer"><div class="record-dot"></div><span id="record-time">0:00</span></div><div class="record-cancel-hint"><i class="fas fa-chevron-left"></i> <span data-i18n="swipeCancel">Свайп для отмены</span></div></div>
+            </div>
+            <div id="readonly-banner" class="readonly-banner hidden" data-i18n="readOnlyChannel">Только администраторы могут писать сюда</div>
+        </div>
+    </main>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+<script src="/js/globals.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/calls.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/rave.js"></script>
+<script src="/js/stories.js"></script>
+<script src="/js/chat.js"></script>
+<script src="/js/app.js"></script>
+
+</body>
+</html>

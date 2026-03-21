@@ -1,0 +1,57 @@
+/* =========================================
+   RAVE (Кинозал) - С ВКЛАДКАМИ И СВОРАЧИВАНИЕМ
+   ========================================= */
+.btn-rave-create { color: #ff3b30 !important; background: rgba(255, 59, 48, 0.1); border-radius: 12px; padding: 6px 12px; font-size: 1rem; display: flex; align-items: center; gap: 6px; cursor: pointer; border: none; font-weight: bold; transition: all 0.2s var(--spring-soft); }
+.btn-rave-create:hover { background: rgba(255, 59, 48, 0.2); transform: translateY(-2px); }
+
+.rave-container { width: 100%; background: #000; display: flex; flex-direction: column; border-bottom: 1px solid var(--border); z-index: 11; flex-shrink: 0; position: relative; }
+.rave-container.is-viewer #rave-iframe-container, .rave-container.is-viewer #rave-html-player { pointer-events: none !important; }
+.rave-video-wrapper { position: relative; width: 100%; max-height: 35vh; aspect-ratio: 16/9; background: #05050a; display: flex; align-items: center; justify-content: center; }
+
+.rave-placeholder { text-align: center; color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.rave-placeholder i { font-size: 3rem; opacity: 0.5; }
+
+.rave-host-controls { background: var(--bg-sidebar); display: flex; flex-direction: column; position: relative; }
+.rave-toggle-btn { width: 100%; padding: 14px; background: rgba(255,255,255,0.05); border: none; color: var(--primary); font-weight: bold; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; }
+.rave-toggle-btn:hover { background: rgba(255,255,255,0.1); }
+
+.rave-panel-content { display: none !important; }
+
+/* ===== СТИЛИ МОДАЛЬНОГО ОКНА ПОИСКА ===== */
+.rave-modal-content { display: flex; flex-direction: column; max-height: 85vh; width: 480px; max-width: 95vw; background: var(--bg-sidebar); border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.06); animation: popIn 0.3s var(--spring-bouncy); }
+.rave-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
+.rave-modal-header h3 { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+
+/* ===== ВКЛАДКИ (ПОИСК / ССЫЛКА) ===== */
+.rave-modal-tabs { display: flex; background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
+.rave-tab { flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); font-weight: bold; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
+.rave-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+.rave-modal-tools { padding: 15px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border); }
+.rave-modal-tools select, .rave-modal-tools input { padding: 12px 15px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-main); color: white; outline: none; font-size: 0.95rem; }
+.rave-modal-tools select { cursor: pointer; }
+.rave-modal-tools input:focus { border-color: var(--primary); }
+
+.rave-search-results { display: flex; flex-direction: column; gap: 12px; padding: 15px; overflow-y: auto; flex: 1; background: var(--bg-sidebar); }
+.rave-search-card { background: var(--bg-secondary); border-radius: 12px; overflow: hidden; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: row; height: 90px; flex-shrink: 0; transition: background 0.2s; }
+.rave-search-card:hover { background: var(--bg-hover); }
+.rave-search-thumb { width: 160px; height: 100%; flex-shrink: 0; position: relative; background: #000; }
+.rave-search-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.rave-search-duration { position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.8); color: white; font-size: 0.75rem; padding: 3px 6px; border-radius: 6px; font-weight: bold; }
+.rave-search-info { padding: 10px 15px; flex: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+.rave-search-title { font-size: 0.9rem; color: white; font-weight: bold; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 5px; line-height: 1.3; }
+.rave-search-author { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ===== КНОПКИ УПРАВЛЕНИЯ ПЛЕЕРОМ ===== */
+.rave-playback-controls { display: flex; justify-content: center; align-items: center; gap: 15px; padding: 15px; background: var(--bg-secondary); border-top: 1px solid rgba(255,255,255,0.05); }
+.rave-ctrl-btn { background: rgba(255,255,255,0.1); border: none; color: white; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; transition: 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+.rave-ctrl-btn:hover { background: rgba(255,255,255,0.25); transform: scale(1.1); }
+.rave-ctrl-btn.sync { width: auto; border-radius: 16px; padding: 0 20px; color: var(--primary); font-weight: bold; background: var(--primary-soft); gap: 8px; font-size: 0.95rem; }
+
+/* ===== СВОРАЧИВАНИЕ ПЛЕЕРА RAVE ===== */
+.rave-minimized-bar { display: none; background: var(--bg-secondary); color: var(--primary); padding: 12px 20px; align-items: center; justify-content: space-between; cursor: pointer; font-weight: bold; border-bottom: 1px solid var(--border); transition: background 0.2s; }
+.rave-minimized-bar:hover { background: var(--bg-hover); }
+.rave-container.rave-minimized .rave-video-wrapper, .rave-container.rave-minimized .rave-host-controls { display: none !important; }
+.rave-container.rave-minimized .rave-minimized-bar { display: flex; }
+.btn-minimize-rave { position: absolute; top: 10px; right: 10px; z-index: 50; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); transition: 0.2s; }
+.btn-minimize-rave:hover { background: rgba(0,0,0,0.8); transform: scale(1.1); }

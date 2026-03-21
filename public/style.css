@@ -1,0 +1,16 @@
+/* =========================================
+   AURA MESSENGER - MAIN STYLE ENTRY
+   ========================================= */
+
+/* Импортируем все модули в строгом порядке */
+@import url('./css/variables.css');
+@import url('./css/base.css');
+@import url('./css/layout.css');
+@import url('./css/components.css');
+@import url('./css/chat.css');
+@import url('./css/stories.css');
+@import url('./css/rave.css');
+@import url('./css/effects.css');
+
+/* Мобильная адаптация всегда идет последней! */
+@import url('./css/mobile.css');
