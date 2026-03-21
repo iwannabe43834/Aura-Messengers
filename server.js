@@ -11,13 +11,62 @@ const { open } = require('sqlite');
 const { ExpressPeerServer } = require('peer');
 const ytSearch = require('yt-search');
 
+// === НОВЫЕ МОДУЛИ ДЛЯ СТАБИЛЬНОСТИ НА RENDER ===
+const multer = require('multer'); 
+const SQLiteStore = require('connect-sqlite3')(session);
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
-    maxHttpBufferSize: 5e7 
+    maxHttpBufferSize: 5e7 // 50MB
 });
 
-const tgToken = '8795912699:AAGNG756DWk2wDZA8fmsRlJSzGjxHvzlK0g';
+// === АВТО-СОЗДАНИЕ ПАПКИ ДЛЯ ЗАГРУЗОК ===
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+
+// === НАСТРОЙКА ХРАНИЛИЩА ФАЙЛОВ (MULTER) ===
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'uploads/'),
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname);
+    }
+});
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 15 * 1024 * 1024 } // Лимит 15МБ на файл
+});
+
+// === НАСТРОЙКИ ПРИЛОЖЕНИЯ ===
+app.use(express.json({ limit: '10mb' })); // Уменьшили лимит для JSON, чтобы не падал Render
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// === СЕССИИ В БАЗЕ ДАННЫХ (СПАСАЕТ ПАМЯТЬ) ===
+app.use(session({
+    store: new SQLiteStore({ db: 'sessions.db', dir: './' }),
+    secret: 'aura-super-secret-key-2026',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure: false 
+    }
+}));
+
+// === МАРШРУТ ДЛЯ ЗАГРУЗКИ МЕДИА (НОВЫЙ) ===
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Файл не выбран' });
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+});
+
+// === ТЕЛЕГРАМ БОТ ===
+const tgToken = '8666406149:AAHJA4-jhQTk2GDfvwfJdtWJejGfpwHvUEs';
 const tgBot = new TelegramBot(tgToken, { 
     polling: true 
 });
@@ -79,14 +128,27 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use(session({
-    secret: 'aura-secret-key-2026-pro',
-    resave: true,
-    saveUninitialized: true,
+    store: new SQLiteStore({ db: 'sessions.db', dir: './' }),
+    secret: 'aura-super-secret-key-2026',
+    resave: false,
+    saveUninitialized: false,
     cookie: { 
-        maxAge: 7 * 24 * 60 * 60 * 1000, 
-        secure: false 
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure: false // Для Render (если нет SSL на самом сервере Node)
     }
 }));
+
+// Обязательно добавь эту строку, чтобы файлы были доступны по ссылке
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Маршрут для загрузки медиа
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Файл не выбран' });
+    
+    // Возвращаем клиенту путь к файлу
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+});
 
 const USERS_FILE = path.join(__dirname, 'users.json');
 const GROUPS_FILE = path.join(__dirname, 'groups.json');
@@ -1126,7 +1188,7 @@ io.on('connection', (socket) => {
             io.to(onlineUsers[target]).emit('user_chat_action', { from: currentUsername, to: currentUsername, action: data.action });
         }
     });
-    
+
     socket.on('upload_story', async (data) => {
         if (!currentUsername) return;
         const id = Date.now().toString();
